@@ -68,7 +68,7 @@ class User extends Authenticatable
 
     public function isManager(): bool
     {
-        return $this->role === UserRole::Manager;
+        return $this->role === UserRole::MANAGER;
     }
 
     public function isReceptionist(): bool
