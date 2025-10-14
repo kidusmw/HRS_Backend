@@ -6,6 +6,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use App\Enums\UserRole;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class User extends Authenticatable
 {
@@ -21,6 +23,9 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'role',
+        'hotel_id',
+        'active',
     ];
 
     /**
@@ -43,6 +48,41 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'active' => 'boolean',
+            'role' => UserRole::class,
         ];
+    }
+
+    /**
+     * Relationships
+     */
+
+
+    /**
+     * Role Check Helper methods
+     */
+    public function isSuperAdmin(): bool
+    {
+        return $this->role === UserRole::SUPERADMIN;
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->role === UserRole::ADMIN;
+    }
+
+    public function isManager(): bool
+    {
+        return $this->role === UserRole::MANAGER;
+    }
+
+    public function isReceptionist(): bool
+    {
+        return $this->role === UserRole::RECEPTIONIST;
+    }
+
+    public function isClient(): bool
+    {
+        return $this->role === UserRole::CLIENT;
     }
 }
