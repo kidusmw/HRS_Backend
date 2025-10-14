@@ -61,6 +61,11 @@ class User extends Authenticatable
     /**
      * Role Check Helper methods
      */
+    public function isSuperAdmin(): bool
+    {
+        return $this->role === UserRole::SUPERADMIN;
+    }
+
     public function isAdmin(): bool
     {
         return $this->role === UserRole::ADMIN;
