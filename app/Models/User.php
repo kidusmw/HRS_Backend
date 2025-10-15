@@ -6,13 +6,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens; // Sanctum token management
 use App\Enums\UserRole;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable; // Include HasApiTokens to manage tokens
 
     /**
      * The attributes that are mass assignable.
@@ -84,5 +85,21 @@ class User extends Authenticatable
     public function isClient(): bool
     {
         return $this->role === UserRole::CLIENT;
+    }
+
+    /**
+     * Model event hooks
+     *
+     * Revoke all tokens when role or active status changes to prevent stale privileges.
+     */
+    protected static function booted(): void
+    {
+        static::updated(function (self $user): void {
+            // If role or active flag changed, invalidate all tokens (role escalation/activation safety)
+            if ($user->wasChanged('role') || $user->wasChanged('active')) {
+                // Inline rationale: Deleting tokens forces new tokens to be minted with up-to-date abilities
+                $user->tokens()->delete();
+            }
+        });
     }
 }
