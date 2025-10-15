@@ -28,6 +28,7 @@ class UserController extends Controller
         $roleMap = [
             'manager' => UserRole::MANAGER,
             'receptionist' => UserRole::RECEPTIONIST,
+            'admin' => UserRole::ADMIN,
         ];
 
         $user = User::create([
