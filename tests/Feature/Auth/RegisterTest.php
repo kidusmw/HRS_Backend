@@ -2,7 +2,7 @@
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-
+use App\Enums\UserRole;
 uses(RefreshDatabase::class);
 
 function register(array $overrides = []): \Illuminate\Testing\TestResponse {
@@ -34,7 +34,7 @@ it('customer_can_register_but_staff_cannot', function () {
     $user = User::where('email', 'elevate@example.com')->first();
     expect($user)->not()->toBeNull();
     // Enum will be serialized server-side, but we assert DB role remains client
-    expect((string) $user->role->name)->toBe('client');
+    expect((string) $user->role->name)->toBe(UserRole::CLIENT->name);
 });
 
 
