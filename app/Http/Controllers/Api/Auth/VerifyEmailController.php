@@ -20,37 +20,54 @@ class VerifyEmailController extends Controller
     {
         // Validate the signature on the URL
         if (! URL::hasValidSignature($request)) {
-            return response()->json([
-                'message' => 'Invalid or expired verification link'
-            ], 403);
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'message' => 'Invalid or expired verification link'
+                ], 403);
+            }
+            return redirect()->to(env('FRONTEND_BASE_URL', 'http://localhost:5173') . '/verify?error=invalid_link');
         }
 
         $user = User::find($id);
         if (! $user) {
-            return response()->json([
-                'message' => 'User not found'
-            ], 404);
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'message' => 'User not found'
+                ], 404);
+            }
+            return redirect()->to(env('FRONTEND_BASE_URL', 'http://localhost:5173') . '/verify?error=user_not_found');
         }
 
         // Ensure the hash matches the user's current email
         if (! hash_equals($hash, sha1($user->getEmailForVerification()))) {
-            return response()->json([
-                'message' => 'Invalid verification hash'
-            ], 403);
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'message' => 'Invalid verification hash'
+                ], 403);
+            }
+            return redirect()->to(env('FRONTEND_BASE_URL', 'http://localhost:5173') . '/verify?error=invalid_hash');
         }
 
         if ($user->hasVerifiedEmail()) {
-            return response()->json([
-                'message' => 'Email already verified'
-            ]);
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'message' => 'Email already verified'
+                ]);
+            }
+            return redirect()->to(env('FRONTEND_BASE_URL', 'http://localhost:5173') . '/verify?success=already_verified');
         }
 
         if ($user->markEmailAsVerified()) {
             event(new Verified($user));
         }
 
-        return response()->json([
-            'message' => 'Email verified successfully'
-        ]);
+        if ($request->wantsJson()) {
+            return response()->json([
+                'message' => 'Email verified successfully'
+            ]);
+        }
+
+        // Redirect to frontend verification page with success
+        return redirect()->to(env('FRONTEND_BASE_URL', 'http://localhost:5173') . '/verify?success=verified');
     }
 }

@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Hash;
 use App\Models\User;
 use App\Enums\UserRole;
 use Laravel\Socialite\Facades\Socialite;
+use Illuminate\Support\Str;
 
 class LoginController extends Controller
 {
@@ -86,12 +87,93 @@ class LoginController extends Controller
 
     public function redirectToGoogle()
     {
-        return Socialite::driver('google')->redirect();
+        // Return the Google OAuth URL for the frontend to redirect to
+        $redirectUrl = Socialite::driver('google')->stateless()->redirect()->getTargetUrl();
+        
+        return response()->json([
+            'redirect_url' => $redirectUrl
+        ]);
     }
 
-    public function handleGoogleCallback()
+    public function handleGoogleCallback(Request $request)
     {
-        $user = Socialite::driver('google')->user();
-        return response()->json($user);
+        try {
+            $googleUser = Socialite::driver('google')->stateless()->user();
+
+            $email = $googleUser->getEmail();
+            $name = $googleUser->getName() ?: $googleUser->getNickname() ?: 'Google User';
+
+            if (!$email) {
+                return response()->json(['message' => 'Unable to retrieve Google account email'], 400);
+            }
+
+            // Find or create user by email
+            $user = User::where('email', $email)->first();
+            if (! $user) {
+                $user = User::create([
+                    'name' => $name,
+                    'email' => $email,
+                    'password' => Str::random(32),
+                    'role' => UserRole::CLIENT,
+                    'email_verified_at' => now(),
+                    'active' => true,
+                ]);
+            } else {
+                // Ensure account is active and verified
+                if (is_null($user->email_verified_at)) {
+                    $user->email_verified_at = now();
+                    $user->save();
+                }
+                if (! $user->active) {
+                    return response()->json(['message' => 'User account is inactive'], 403);
+                }
+            }
+
+            // Rotate existing tokens
+            $user->tokens()->delete();
+
+            // Map abilities by role
+            $abilities = [];
+            switch ($user->role) {
+                case UserRole::SUPERADMIN:
+                    $abilities = ['*'];
+                    break;
+                case UserRole::ADMIN:
+                    $abilities = [
+                        'user.create', 'user.read', 'user.update', 'user.deactivate',
+                        'staff.manage', 'reservation.manage', 'room.manage',
+                    ];
+                    break;
+                case UserRole::MANAGER:
+                    $abilities = [
+                        'reservation.manage', 'reservation.read', 'room.manage', 'report.read',
+                    ];
+                    break;
+                case UserRole::RECEPTIONIST:
+                    $abilities = [
+                        'reservation.create', 'reservation.read', 'reservation.update',
+                        'checkin.process', 'checkout.process',
+                    ];
+                    break;
+                case UserRole::CLIENT:
+                default:
+                    $abilities = ['reservation.create', 'reservation.read', 'profile.update'];
+                    break;
+            }
+
+            $token = $user->createToken('auth_token', $abilities)->plainTextToken;
+
+            return response()->json([
+                'message' => 'Google authentication successful',
+                'user' => $user,
+                'access_token' => $token,
+                'token_type' => 'Bearer',
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'Google authentication failed',
+                'error' => $e->getMessage()
+            ], 400);
+        }
     }
 }
