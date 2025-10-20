@@ -13,6 +13,8 @@ use App\Http\Controllers\Api\Auth\VerifyEmailController;
  */
 Route::post('/register', [RegisterController::class, 'register']);
 Route::post('/login', [LoginController::class, 'login']);
+Route::get('/auth/google/redirect', [LoginController::class, 'redirectToGoogle'])->name('google.redirect');
+Route::get('/auth/google/callback', [LoginController::class, 'handleGoogleCallback'])->name('google.callback');
 
 // Email verification route - must be named 'verification.verify' for VerifyEmail notification
 Route::get('/email/verify/{id}/{hash}', VerifyEmailController::class)
