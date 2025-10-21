@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\Auth\RegisterController;
 use App\Http\Controllers\Api\Auth\LoginController;
 use App\Http\Controllers\Api\Auth\LogoutController;
 use App\Http\Controllers\Api\Auth\VerifyEmailController;
+use App\Http\Controllers\Api\Auth\PasswordResetController;
 
 /**
  * Public Routes
@@ -19,6 +20,10 @@ Route::get('/auth/google/callback', [LoginController::class, 'handleGoogleCallba
 // Email verification route - must be named 'verification.verify' for VerifyEmail notification
 Route::get('/email/verify/{id}/{hash}', VerifyEmailController::class)
     ->name('verification.verify');
+
+// Password reset (API-only)
+Route::post('/password/forgot', [PasswordResetController::class, 'sendResetLinkEmail']);
+Route::post('/password/reset', [PasswordResetController::class, 'reset']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [LogoutController::class, 'logout']);
