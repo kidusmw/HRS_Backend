@@ -13,7 +13,8 @@ class HotelResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $admin = $this->users()->where('role', UserRole::ADMIN)->first();
+        // Use the primaryAdmin relationship (eager loaded)
+        $admin = $this->primaryAdmin;
         
         return [
             'id' => $this->id,
@@ -21,6 +22,7 @@ class HotelResource extends JsonResource
             'address' => $this->address ?? '',
             'timezone' => $this->timezone,
             'adminName' => $admin?->name,
+            'adminId' => $admin?->id,
             'roomsCount' => $this->rooms()->count(),
             'phoneNumber' => $this->phone,
             'email' => $this->email,

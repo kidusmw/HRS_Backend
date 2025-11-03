@@ -29,6 +29,20 @@ class UpdateHotelRequest extends FormRequest
             'description' => ['nullable', 'string'],
             'timezone' => ['sometimes', 'string', 'timezone'],
             'logo_path' => ['nullable', 'string', 'max:255'],
+            'primary_admin_id' => [
+                'sometimes',
+                'nullable',
+                'integer',
+                'exists:users,id',
+                function ($attribute, $value, $fail) {
+                    if ($value !== null && $value !== '') {
+                        $user = \App\Models\User::find($value);
+                        if ($user && $user->role !== \App\Enums\UserRole::ADMIN) {
+                            $fail('The selected user must have the admin role.');
+                        }
+                    }
+                },
+            ],
         ];
     }
 }

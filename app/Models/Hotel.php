@@ -20,6 +20,7 @@ class Hotel extends Model
         'description',
         'timezone',
         'logo_path',
+        'primary_admin_id',
     ];
 
     protected function casts(): array
@@ -60,6 +61,14 @@ class Hotel extends Model
     public function settings(): HasMany
     {
         return $this->hasMany(HotelSetting::class);
+    }
+
+    /**
+     * Get the primary admin user for this hotel
+     */
+    public function primaryAdmin(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'primary_admin_id');
     }
 }
 
