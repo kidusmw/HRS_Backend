@@ -10,6 +10,7 @@ use Laravel\Sanctum\HasApiTokens; // Sanctum token management
 use App\Enums\UserRole;
 use App\Notifications\ResetPasswordNotification;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class User extends Authenticatable
 {
@@ -29,6 +30,7 @@ class User extends Authenticatable
         'role',
         'hotel_id',
         'active',
+        'phone_number',
     ];
 
     /**
@@ -59,6 +61,25 @@ class User extends Authenticatable
     /**
      * Relationships
      */
+    public function hotel(): BelongsTo
+    {
+        return $this->belongsTo(Hotel::class);
+    }
+
+    public function auditLogs(): HasMany
+    {
+        return $this->hasMany(AuditLog::class);
+    }
+
+    public function reservations(): HasMany
+    {
+        return $this->hasMany(Reservation::class);
+    }
+
+    public function createdBackups(): HasMany
+    {
+        return $this->hasMany(Backup::class, 'created_by');
+    }
 
 
     /**
