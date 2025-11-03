@@ -165,17 +165,15 @@ class HotelController extends Controller
             // But we'll do it explicitly to be safe
             $hotel->users()->update(['hotel_id' => null]);
             
-            // 5. Update audit logs and backups to null hotel_id (nullOnDelete should handle this)
-            // These are already set to nullOnDelete in migrations, but being explicit
-            
-            // Now delete the hotel
-            $hotel->delete();
-
-            // Log the deletion after successful deletion
+            // 5. Log the deletion BEFORE deleting the hotel (so foreign key constraint is satisfied)
+            // We store hotel_id and hotel_name in meta for reference
             AuditLogger::log('hotel.deleted', auth()->user(), $hotelId, [
                 'hotel_id' => $hotelId,
                 'hotel_name' => $hotelName,
             ]);
+            
+            // Now delete the hotel
+            $hotel->delete();
 
             return response()->json(['message' => 'Hotel deleted successfully']);
         } catch (\Illuminate\Database\QueryException $e) {
