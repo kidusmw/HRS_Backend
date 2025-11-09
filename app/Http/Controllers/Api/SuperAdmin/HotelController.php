@@ -59,6 +59,15 @@ class HotelController extends Controller
 
         $hotel = Hotel::create($validated);
         
+        // Sync admin user's hotel_id with hotel's primary_admin_id
+        if ($hotel->primary_admin_id) {
+            $admin = \App\Models\User::find($hotel->primary_admin_id);
+            if ($admin) {
+                $admin->hotel_id = $hotel->id;
+                $admin->save();
+            }
+        }
+        
         // Load primaryAdmin relationship for response
         $hotel->load('primaryAdmin');
 
@@ -114,9 +123,36 @@ class HotelController extends Controller
             }
         }
 
+        // Track the old primary admin before updating
+        $oldPrimaryAdminId = $hotel->primary_admin_id;
+        
         $changes = array_intersect_key($validated, $original);
         $hotel->fill($validated);
         $hotel->save();
+        
+        // Sync admin user's hotel_id with hotel's primary_admin_id
+        $newPrimaryAdminId = $hotel->primary_admin_id;
+        
+        // If primary admin changed, update the users' hotel_id accordingly
+        if ($oldPrimaryAdminId !== $newPrimaryAdminId) {
+            // Unassign the old primary admin from this hotel (if there was one)
+            if ($oldPrimaryAdminId) {
+                $oldAdmin = \App\Models\User::find($oldPrimaryAdminId);
+                if ($oldAdmin && $oldAdmin->hotel_id === $hotel->id) {
+                    $oldAdmin->hotel_id = null;
+                    $oldAdmin->save();
+                }
+            }
+            
+            // Assign the new primary admin to this hotel
+            if ($newPrimaryAdminId) {
+                $newAdmin = \App\Models\User::find($newPrimaryAdminId);
+                if ($newAdmin) {
+                    $newAdmin->hotel_id = $hotel->id;
+                    $newAdmin->save();
+                }
+            }
+        }
         
         // Refresh the hotel from database and reload primaryAdmin relationship
         $hotel->refresh();
@@ -165,7 +201,16 @@ class HotelController extends Controller
             // But we'll do it explicitly to be safe
             $hotel->users()->update(['hotel_id' => null]);
             
-            // 5. Log the deletion BEFORE deleting the hotel (so foreign key constraint is satisfied)
+            // 5. Unassign primary admin's hotel_id before deletion
+            if ($hotel->primary_admin_id) {
+                $primaryAdmin = \App\Models\User::find($hotel->primary_admin_id);
+                if ($primaryAdmin && $primaryAdmin->hotel_id === $hotelId) {
+                    $primaryAdmin->hotel_id = null;
+                    $primaryAdmin->save();
+                }
+            }
+            
+            // 6. Log the deletion BEFORE deleting the hotel (so foreign key constraint is satisfied)
             // We store hotel_id and hotel_name in meta for reference
             AuditLogger::log('hotel.deleted', auth()->user(), $hotelId, [
                 'hotel_id' => $hotelId,

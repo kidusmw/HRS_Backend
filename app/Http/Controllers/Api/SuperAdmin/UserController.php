@@ -106,6 +106,16 @@ class UserController extends Controller
         $validated['email_verified_at'] = now();
 
         $user = User::create($validated);
+        
+        // If user is an admin and assigned to a hotel, sync with hotel's primary_admin_id
+        if ($user->role === \App\Enums\UserRole::ADMIN && $user->hotel_id) {
+            $hotel = \App\Models\Hotel::find($user->hotel_id);
+            if ($hotel && !$hotel->primary_admin_id) {
+                // If hotel has no primary admin, make this user the primary admin
+                $hotel->primary_admin_id = $user->id;
+                $hotel->save();
+            }
+        }
 
         AuditLogger::logUserCreated($user, auth()->user());
         $user->load('hotel');
@@ -161,12 +171,63 @@ class UserController extends Controller
             $validated['role'] = UserRole::from($validated['role']);
         }
 
+        // Track the old hotel_id before updating
+        $oldHotelId = $user->hotel_id;
+        
+        // Check if hotel_id is being updated (check request directly, not just validated, since null might not be in validated)
+        $hotelIdChanged = false;
+        $newHotelId = null;
+        if ($request->has('hotel_id')) {
+            $hotelIdChanged = true;
+            $newHotelId = $request->input('hotel_id');
+            // Ensure hotel_id is in validated array for fill()
+            if ($newHotelId === null || $newHotelId === '') {
+                $validated['hotel_id'] = null;
+            } else {
+                $validated['hotel_id'] = (int) $newHotelId;
+            }
+        }
+        
         $changes = array_intersect_key($validated, $original);
         $user->fill($validated);
         if (array_key_exists('password', $validated) && $validated['password']) {
             $user->password = $validated['password'];
         }
         $user->save();
+        
+        // If user is an admin and hotel_id changed, sync with hotel's primary_admin_id
+        if ($user->role === \App\Enums\UserRole::ADMIN && $hotelIdChanged) {
+            // If user is being unassigned from hotel (hotel_id set to null)
+            // Clear primary_admin_id from ALL hotels where this user is the primary admin
+            if ($newHotelId === null || $newHotelId === '') {
+                $hotelsWithThisAdmin = \App\Models\Hotel::where('primary_admin_id', $user->id)->get();
+                foreach ($hotelsWithThisAdmin as $hotel) {
+                    $hotel->primary_admin_id = null;
+                    $hotel->save();
+                }
+            } else {
+                // User is being assigned to a hotel (or reassigned to a different hotel)
+                $newHotelIdInt = (int) $newHotelId;
+                
+                // If user was primary admin of old hotel, unassign them from that hotel
+                if ($oldHotelId && $oldHotelId !== $newHotelIdInt) {
+                    $oldHotel = \App\Models\Hotel::where('primary_admin_id', $user->id)
+                        ->where('id', $oldHotelId)
+                        ->first();
+                    if ($oldHotel) {
+                        $oldHotel->primary_admin_id = null;
+                        $oldHotel->save();
+                    }
+                }
+                
+                // If user is assigned to a new hotel, make them the primary admin if no primary admin exists
+                $newHotel = \App\Models\Hotel::find($newHotelIdInt);
+                if ($newHotel && !$newHotel->primary_admin_id) {
+                    $newHotel->primary_admin_id = $user->id;
+                    $newHotel->save();
+                }
+            }
+        }
         $user->load('hotel');
 
         AuditLogger::logUserUpdated($user, $changes, auth()->user());
