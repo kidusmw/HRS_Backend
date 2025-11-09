@@ -10,6 +10,7 @@ use App\Http\Resources\UserResource;
 use App\Http\Requests\SuperAdmin\StoreUserRequest;
 use App\Http\Requests\SuperAdmin\UpdateUserRequest;
 use App\Services\AuditLogger;
+use App\Notifications\PasswordResetByAdminNotification;
 
 class UserController extends Controller
 {
@@ -303,16 +304,35 @@ class UserController extends Controller
      * @param int $id
      * @return \Illuminate\Http\JsonResponse
      * 
-     * This method resets a user's password.
-     * The user's password is reset and returned in the response.
+     * This method resets a user's password and sends it to their email.
      */
     public function resetPassword(int $id)
     {
         $user = User::findOrFail($id);
-        $new = \Str::password(12);
-        $user->password = $new;
+        $newPassword = \Str::password(12);
+        
+        // Hash the password before saving
+        $user->password = \Hash::make($newPassword);
         $user->save();
-        return response()->json(['message' => 'Password reset', 'password' => $new]);
+        
+        // Send the new password to the user's email
+        $user->notify(new PasswordResetByAdminNotification($newPassword));
+        
+        // Log the action
+        AuditLogger::log(
+            'user.password_reset',
+            auth()->user(),
+            null,
+            [
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'user_email' => $user->email,
+            ]
+        );
+        
+        return response()->json([
+            'message' => 'Password reset successfully. The new password has been sent to the user\'s email.'
+        ]);
     }
 
     /**
