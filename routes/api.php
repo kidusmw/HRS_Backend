@@ -60,6 +60,7 @@ Route::prefix('super_admin')->middleware(['auth:sanctum', 'role:superadmin'])->g
     Route::patch('/users/{id}/activate', [SuperAdminUserController::class, 'activate']);
     Route::patch('/users/{id}/deactivate', [SuperAdminUserController::class, 'deactivate']);
     Route::post('/users/{id}/reset-password', [SuperAdminUserController::class, 'resetPassword']);
+    Route::delete('/users/{id}', [SuperAdminUserController::class, 'destroy']);
 
     // Hotels
     Route::get('/hotels', [SuperAdminHotelController::class, 'index']);

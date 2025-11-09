@@ -314,6 +314,76 @@ class UserController extends Controller
         $user->save();
         return response()->json(['message' => 'Password reset', 'password' => $new]);
     }
+
+    /**
+     * Delete a user
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
+     * 
+     * This method deletes a user.
+     * Before deletion, it:
+     * - Prevents deleting yourself
+     * - Clears the user's primary_admin_id from any hotels if they are an admin
+     * - Logs the deletion
+     * 
+     * The user is permanently deleted from the database.
+     */
+    public function destroy(int $id)
+    {
+        try {
+            $user = User::findOrFail($id);
+            
+            // Prevent deleting yourself
+            if ($user->id === auth()->id()) {
+                return response()->json([
+                    'message' => 'You cannot delete your own account'
+                ], 422);
+            }
+
+            // Store user info before deletion for logging
+            $userId = $user->id;
+            $userName = $user->name;
+            $userHotelId = $user->hotel_id;
+            $userRole = $user->role;
+
+            // If user is an admin and is primary admin of any hotel, clear that relationship
+            if ($userRole === \App\Enums\UserRole::ADMIN) {
+                $hotelsWithThisAdmin = \App\Models\Hotel::where('primary_admin_id', $user->id)->get();
+                foreach ($hotelsWithThisAdmin as $hotel) {
+                    $hotel->primary_admin_id = null;
+                    $hotel->save();
+                }
+            }
+
+            // Log the deletion before deleting the user
+            AuditLogger::log('user.deleted', auth()->user(), $userHotelId, [
+                'user_id' => $userId,
+                'user_name' => $userName,
+                'user_role' => $userRole->value,
+            ]);
+
+            // Delete the user
+            $user->delete();
+
+            return response()->json(['message' => 'User deleted successfully']);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'User not found',
+                'error' => "User with ID {$id} does not exist"
+            ], 404);
+        } catch (\Exception $e) {
+            \Log::error('User deletion error', [
+                'user_id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
+            return response()->json([
+                'message' => 'Failed to delete user',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred'
+            ], 500);
+        }
+    }
 }
 
 
