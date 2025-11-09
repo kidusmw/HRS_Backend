@@ -280,6 +280,14 @@ class UserController extends Controller
         $user = User::findOrFail($id);
         $user->active = true;
         $user->save();
+
+        // Log the activation
+        AuditLogger::log('User Activated', auth()->user(), $user->hotel_id, [
+            'user_id' => $user->id,
+            'user_name' => $user->name,
+            'user_email' => $user->email,
+        ]);
+
         return response()->json(['message' => 'User activated']);
     }
 
@@ -296,6 +304,14 @@ class UserController extends Controller
         $user = User::findOrFail($id);
         $user->active = false;
         $user->save();
+
+        // Log the deactivation
+        AuditLogger::log('User Deactivated', auth()->user(), $user->hotel_id, [
+            'user_id' => $user->id,
+            'user_name' => $user->name,
+            'user_email' => $user->email,
+        ]);
+
         return response()->json(['message' => 'User deactivated']);
     }
 

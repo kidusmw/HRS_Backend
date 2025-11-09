@@ -10,6 +10,7 @@ use App\Models\Hotel;
 use App\Http\Resources\SystemSettingsResource;
 use App\Http\Requests\SuperAdmin\UpdateSystemSettingsRequest;
 use App\Http\Requests\SuperAdmin\UpdateHotelSettingsRequest;
+use App\Services\AuditLogger;
 
 class SettingsController extends Controller
 {
@@ -19,7 +20,7 @@ class SettingsController extends Controller
             'systemName' => SystemSetting::getValue('system_name', config('app.name')),
             'systemLogoUrl' => SystemSetting::getValue('system_logo_url'),
             'defaultCurrency' => SystemSetting::getValue('default_currency', 'USD'),
-            'defaultTimezone' => SystemSetting::getValue('default_timezone', config('app.timezone')),
+            'defaultTimezone' => SystemSetting::getValue('default_timezone', 'UTC'),
         ];
 
         return new SystemSettingsResource($settings);
@@ -27,7 +28,16 @@ class SettingsController extends Controller
 
     public function updateSystem(UpdateSystemSettingsRequest $request)
     {
+        // Get current settings before update
+        $oldSettings = [
+            'systemName' => SystemSetting::getValue('system_name', config('app.name')),
+            'systemLogoUrl' => SystemSetting::getValue('system_logo_url'),
+            'defaultCurrency' => SystemSetting::getValue('default_currency', 'USD'),
+            'defaultTimezone' => SystemSetting::getValue('default_timezone', 'UTC'),
+        ];
+
         $validated = $request->validated();
+        $changes = [];
 
         foreach ($validated as $key => $value) {
             $settingKey = match($key) {
@@ -39,8 +49,22 @@ class SettingsController extends Controller
             };
 
             if ($settingKey) {
-                SystemSetting::setValue($settingKey, $value);
+                $oldValue = $oldSettings[$key] ?? null;
+                if ($oldValue !== $value) {
+                    $changes[$key] = [
+                        'old' => $oldValue,
+                        'new' => $value,
+                    ];
+                    SystemSetting::setValue($settingKey, $value);
+                }
             }
+        }
+
+        // Log the settings update if there were any changes
+        if (!empty($changes)) {
+            AuditLogger::log('System Settings Updated', auth()->user(), null, [
+                'changes' => $changes,
+            ]);
         }
 
         return $this->getSystem();

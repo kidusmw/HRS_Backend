@@ -16,7 +16,7 @@ class SystemSettingsResource extends JsonResource
             'systemName' => $this->resource['systemName'] ?? config('app.name'),
             'systemLogoUrl' => $this->resource['systemLogoUrl'] ?? null,
             'defaultCurrency' => $this->resource['defaultCurrency'] ?? 'USD',
-            'defaultTimezone' => $this->resource['defaultTimezone'] ?? config('app.timezone'),
+            'defaultTimezone' => $this->resource['defaultTimezone'] ?? 'UTC',
         ];
     }
 }

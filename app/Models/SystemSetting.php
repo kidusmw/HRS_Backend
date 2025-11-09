@@ -11,12 +11,7 @@ class SystemSetting extends Model
         'value',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'value' => 'array',
-        ];
-    }
+    // No casts needed - value is stored as string/text
 
     /**
      * Get a setting value by key
