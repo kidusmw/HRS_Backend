@@ -16,11 +16,15 @@ class BackupController extends Controller
         private BackupService $backupService
     ) {}
 
-    public function index()
+    public function index(Request $request)
     {
+        $perPage = $request->integer('per_page', 10);
+        $page = $request->integer('page', 1);
+        
+        // Get backups with hotel and creator, order by created_at descending, paginate the results
         $backups = Backup::with(['hotel', 'creator'])
             ->orderBy('created_at', 'desc')
-            ->paginate(15);
+            ->paginate($perPage, ['*'], 'page', $page);
         
         return BackupResource::collection($backups);
     }
