@@ -34,7 +34,7 @@ class StoreUserRequest extends FormRequest
             'generatePassword' => ['sometimes', 'boolean'],
             'role' => ['required', Rule::in(['receptionist', 'manager', 'admin', 'superadmin', 'super_admin'])],
             'hotel_id' => ['nullable', 'integer', 'exists:hotels,id'],
-            'phone_number' => ['nullable', 'string', 'max:20'],
+            'phone_number' => ['required', 'string', 'max:20'],
             'active' => ['sometimes', 'boolean'],
         ];
     }
