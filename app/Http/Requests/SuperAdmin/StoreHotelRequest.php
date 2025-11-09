@@ -23,11 +23,12 @@ class StoreHotelRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'address' => ['nullable', 'string'],
+            'city' => ['required', 'string', 'max:255'],
+            'country' => ['required', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:20'],
             'email' => ['nullable', 'email', 'max:255'],
             'description' => ['nullable', 'string'],
-            'timezone' => ['required', 'string', 'timezone'],
+            'timezone' => ['nullable', 'string', 'timezone'], // Auto-determined from city/country if not provided
             'logo_path' => ['nullable', 'string', 'max:255'],
             'primary_admin_id' => [
                 'nullable',
