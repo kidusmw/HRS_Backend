@@ -51,6 +51,8 @@ class BackupController extends Controller
             return response()->json(['message' => 'Backup not available'], 404);
         }
 
+        // Use the configured backup disk for full backups, 'local' for hotel backups
+        // The 'local' disk root is storage/app/private, so paths are relative to that
         $disk = $backup->type === 'full' ? env('BACKUP_DISK', 'local') : 'local';
         
         if (!Storage::disk($disk)->exists($backup->path)) {
