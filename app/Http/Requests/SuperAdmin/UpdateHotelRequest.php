@@ -23,11 +23,12 @@ class UpdateHotelRequest extends FormRequest
     {
         return [
             'name' => ['sometimes', 'string', 'max:255'],
-            'address' => ['nullable', 'string'],
+            'city' => ['sometimes', 'required', 'string', 'max:255'],
+            'country' => ['sometimes', 'required', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:20'],
             'email' => ['nullable', 'email', 'max:255'],
             'description' => ['nullable', 'string'],
-            'timezone' => ['sometimes', 'string', 'timezone'],
+            'timezone' => ['sometimes', 'nullable', 'string', 'timezone'], // Auto-determined from city/country if not provided
             'logo_path' => ['nullable', 'string', 'max:255'],
             'primary_admin_id' => [
                 'sometimes',

@@ -11,6 +11,7 @@ use App\Http\Resources\HotelResource;
 use App\Http\Requests\SuperAdmin\StoreHotelRequest;
 use App\Http\Requests\SuperAdmin\UpdateHotelRequest;
 use App\Services\AuditLogger;
+use App\Services\TimezoneService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class HotelController extends Controller
@@ -21,7 +22,7 @@ class HotelController extends Controller
         $query = Hotel::with('primaryAdmin');
 
         /**
-         * Search by name or address
+         * Search by name, city, or country
          * Filter by timezone
          * Filter by has admin
          * Paginate the results
@@ -30,7 +31,8 @@ class HotelController extends Controller
         if ($search = $request->string('search')->toString()) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('address', 'like', "%{$search}%");
+                  ->orWhere('city', 'like', "%{$search}%")
+                  ->orWhere('country', 'like', "%{$search}%");
             });
         }
 
@@ -55,6 +57,11 @@ class HotelController extends Controller
             $validated['primary_admin_id'] = null;
         } elseif (isset($validated['primary_admin_id'])) {
             $validated['primary_admin_id'] = (int) $validated['primary_admin_id'];
+        }
+
+        // Automatically determine timezone from city and country
+        if (!isset($validated['timezone']) && isset($validated['city']) && isset($validated['country'])) {
+            $validated['timezone'] = TimezoneService::getTimezoneFromLocation($validated['city'], $validated['country']);
         }
 
         $hotel = Hotel::create($validated);
@@ -125,6 +132,15 @@ class HotelController extends Controller
 
         // Track the old primary admin before updating
         $oldPrimaryAdminId = $hotel->primary_admin_id;
+        
+        // Automatically determine timezone if city or country changed
+        if ((isset($validated['city']) || isset($validated['country'])) && !isset($validated['timezone'])) {
+            $city = $validated['city'] ?? $hotel->city;
+            $country = $validated['country'] ?? $hotel->country;
+            if ($city && $country) {
+                $validated['timezone'] = TimezoneService::getTimezoneFromLocation($city, $country);
+            }
+        }
         
         $changes = array_intersect_key($validated, $original);
         $hotel->fill($validated);
