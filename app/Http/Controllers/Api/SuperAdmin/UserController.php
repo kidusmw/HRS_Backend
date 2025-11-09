@@ -171,8 +171,9 @@ class UserController extends Controller
             $validated['role'] = UserRole::from($validated['role']);
         }
 
-        // Track the old hotel_id before updating
+        // Track the old values before updating
         $oldHotelId = $user->hotel_id;
+        $oldRole = $user->role;
         
         // Check if hotel_id is being updated (check request directly, not just validated, since null might not be in validated)
         $hotelIdChanged = false;
@@ -188,12 +189,31 @@ class UserController extends Controller
             }
         }
         
+        // Check if role is being updated
+        // Compare the enum values properly (original might be string, validated is enum after normalization)
+        $roleChanged = false;
+        if (isset($validated['role'])) {
+            $oldRoleValue = $oldRole instanceof \App\Enums\UserRole ? $oldRole->value : $oldRole;
+            $newRoleValue = $validated['role'] instanceof \App\Enums\UserRole ? $validated['role']->value : $validated['role'];
+            $roleChanged = $oldRoleValue !== $newRoleValue;
+        }
+        
         $changes = array_intersect_key($validated, $original);
         $user->fill($validated);
         if (array_key_exists('password', $validated) && $validated['password']) {
             $user->password = $validated['password'];
         }
         $user->save();
+        
+        // If role changed from ADMIN to non-ADMIN, clear primary_admin_id from all hotels
+        if ($roleChanged && $oldRole === \App\Enums\UserRole::ADMIN && $user->role !== \App\Enums\UserRole::ADMIN) {
+            // User is no longer an admin, so they can't be a primary admin
+            $hotelsWithThisAdmin = \App\Models\Hotel::where('primary_admin_id', $user->id)->get();
+            foreach ($hotelsWithThisAdmin as $hotel) {
+                $hotel->primary_admin_id = null;
+                $hotel->save();
+            }
+        }
         
         // If user is an admin and hotel_id changed, sync with hotel's primary_admin_id
         if ($user->role === \App\Enums\UserRole::ADMIN && $hotelIdChanged) {
@@ -226,6 +246,17 @@ class UserController extends Controller
                     $newHotel->primary_admin_id = $user->id;
                     $newHotel->save();
                 }
+            }
+        }
+        
+        // If role changed to ADMIN and user has a hotel, sync with hotel's primary_admin_id
+        if ($roleChanged && $oldRole !== \App\Enums\UserRole::ADMIN && $user->role === \App\Enums\UserRole::ADMIN && $user->hotel_id) {
+            // User just became an admin and has a hotel assignment
+            $hotel = \App\Models\Hotel::find($user->hotel_id);
+            if ($hotel && !$hotel->primary_admin_id) {
+                // If hotel has no primary admin, make this user the primary admin
+                $hotel->primary_admin_id = $user->id;
+                $hotel->save();
             }
         }
         $user->load('hotel');
