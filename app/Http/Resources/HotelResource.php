@@ -1,0 +1,33 @@
+<?php
+
+namespace App\Http\Resources;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+use App\Enums\UserRole;
+
+class HotelResource extends JsonResource
+{
+    /**
+     * Transform the resource into an array matching frontend HotelListItem contract
+     */
+    public function toArray(Request $request): array
+    {
+        // Use the primaryAdmin relationship (eager loaded)
+        $admin = $this->primaryAdmin;
+        
+        return [
+            'id' => $this->id,
+            'name' => $this->name,
+            'city' => $this->city,
+            'country' => $this->country,
+            'timezone' => $this->timezone,
+            'adminName' => $admin?->name,
+            'adminId' => $admin?->id,
+            'roomsCount' => $this->rooms()->count(),
+            'phoneNumber' => $this->phone,
+            'email' => $this->email,
+        ];
+    }
+}
+
