@@ -17,8 +17,14 @@ class LogController extends Controller
             $query->where('user_id', $userId);
         }
 
-        if ($hotelId = $request->integer('hotelId')) {
-            $query->where('hotel_id', $hotelId);
+        if ($request->has('hotelId')) {
+            $hotelId = $request->integer('hotelId');
+            if ($hotelId === 0) {
+                // Global actions (no hotel)
+                $query->whereNull('hotel_id');
+            } else {
+                $query->where('hotel_id', $hotelId);
+            }
         }
 
         if ($action = $request->string('action')->toString()) {
