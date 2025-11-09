@@ -10,6 +10,7 @@ use App\Http\Resources\UserResource;
 use App\Http\Requests\SuperAdmin\StoreUserRequest;
 use App\Http\Requests\SuperAdmin\UpdateUserRequest;
 use App\Services\AuditLogger;
+use App\Notifications\PasswordResetByAdminNotification;
 
 class UserController extends Controller
 {
@@ -106,6 +107,16 @@ class UserController extends Controller
         $validated['email_verified_at'] = now();
 
         $user = User::create($validated);
+        
+        // If user is an admin and assigned to a hotel, sync with hotel's primary_admin_id
+        if ($user->role === \App\Enums\UserRole::ADMIN && $user->hotel_id) {
+            $hotel = \App\Models\Hotel::find($user->hotel_id);
+            if ($hotel && !$hotel->primary_admin_id) {
+                // If hotel has no primary admin, make this user the primary admin
+                $hotel->primary_admin_id = $user->id;
+                $hotel->save();
+            }
+        }
 
         AuditLogger::logUserCreated($user, auth()->user());
         $user->load('hotel');
@@ -161,12 +172,94 @@ class UserController extends Controller
             $validated['role'] = UserRole::from($validated['role']);
         }
 
+        // Track the old values before updating
+        $oldHotelId = $user->hotel_id;
+        $oldRole = $user->role;
+        
+        // Check if hotel_id is being updated (check request directly, not just validated, since null might not be in validated)
+        $hotelIdChanged = false;
+        $newHotelId = null;
+        if ($request->has('hotel_id')) {
+            $hotelIdChanged = true;
+            $newHotelId = $request->input('hotel_id');
+            // Ensure hotel_id is in validated array for fill()
+            if ($newHotelId === null || $newHotelId === '') {
+                $validated['hotel_id'] = null;
+            } else {
+                $validated['hotel_id'] = (int) $newHotelId;
+            }
+        }
+        
+        // Check if role is being updated
+        // Compare the enum values properly (original might be string, validated is enum after normalization)
+        $roleChanged = false;
+        if (isset($validated['role'])) {
+            $oldRoleValue = $oldRole instanceof \App\Enums\UserRole ? $oldRole->value : $oldRole;
+            $newRoleValue = $validated['role'] instanceof \App\Enums\UserRole ? $validated['role']->value : $validated['role'];
+            $roleChanged = $oldRoleValue !== $newRoleValue;
+        }
+        
         $changes = array_intersect_key($validated, $original);
         $user->fill($validated);
         if (array_key_exists('password', $validated) && $validated['password']) {
             $user->password = $validated['password'];
         }
         $user->save();
+        
+        // If role changed from ADMIN to non-ADMIN, clear primary_admin_id from all hotels
+        if ($roleChanged && $oldRole === \App\Enums\UserRole::ADMIN && $user->role !== \App\Enums\UserRole::ADMIN) {
+            // User is no longer an admin, so they can't be a primary admin
+            $hotelsWithThisAdmin = \App\Models\Hotel::where('primary_admin_id', $user->id)->get();
+            foreach ($hotelsWithThisAdmin as $hotel) {
+                $hotel->primary_admin_id = null;
+                $hotel->save();
+            }
+        }
+        
+        // If user is an admin and hotel_id changed, sync with hotel's primary_admin_id
+        if ($user->role === \App\Enums\UserRole::ADMIN && $hotelIdChanged) {
+            // If user is being unassigned from hotel (hotel_id set to null)
+            // Clear primary_admin_id from ALL hotels where this user is the primary admin
+            if ($newHotelId === null || $newHotelId === '') {
+                $hotelsWithThisAdmin = \App\Models\Hotel::where('primary_admin_id', $user->id)->get();
+                foreach ($hotelsWithThisAdmin as $hotel) {
+                    $hotel->primary_admin_id = null;
+                    $hotel->save();
+                }
+            } else {
+                // User is being assigned to a hotel (or reassigned to a different hotel)
+                $newHotelIdInt = (int) $newHotelId;
+                
+                // If user was primary admin of old hotel, unassign them from that hotel
+                if ($oldHotelId && $oldHotelId !== $newHotelIdInt) {
+                    $oldHotel = \App\Models\Hotel::where('primary_admin_id', $user->id)
+                        ->where('id', $oldHotelId)
+                        ->first();
+                    if ($oldHotel) {
+                        $oldHotel->primary_admin_id = null;
+                        $oldHotel->save();
+                    }
+                }
+                
+                // If user is assigned to a new hotel, make them the primary admin if no primary admin exists
+                $newHotel = \App\Models\Hotel::find($newHotelIdInt);
+                if ($newHotel && !$newHotel->primary_admin_id) {
+                    $newHotel->primary_admin_id = $user->id;
+                    $newHotel->save();
+                }
+            }
+        }
+        
+        // If role changed to ADMIN and user has a hotel, sync with hotel's primary_admin_id
+        if ($roleChanged && $oldRole !== \App\Enums\UserRole::ADMIN && $user->role === \App\Enums\UserRole::ADMIN && $user->hotel_id) {
+            // User just became an admin and has a hotel assignment
+            $hotel = \App\Models\Hotel::find($user->hotel_id);
+            if ($hotel && !$hotel->primary_admin_id) {
+                // If hotel has no primary admin, make this user the primary admin
+                $hotel->primary_admin_id = $user->id;
+                $hotel->save();
+            }
+        }
         $user->load('hotel');
 
         AuditLogger::logUserUpdated($user, $changes, auth()->user());
@@ -211,16 +304,105 @@ class UserController extends Controller
      * @param int $id
      * @return \Illuminate\Http\JsonResponse
      * 
-     * This method resets a user's password.
-     * The user's password is reset and returned in the response.
+     * This method resets a user's password and sends it to their email.
      */
     public function resetPassword(int $id)
     {
         $user = User::findOrFail($id);
-        $new = \Str::password(12);
-        $user->password = $new;
+        $newPassword = \Str::password(12);
+        
+        // Hash the password before saving
+        $user->password = \Hash::make($newPassword);
         $user->save();
-        return response()->json(['message' => 'Password reset', 'password' => $new]);
+        
+        // Send the new password to the user's email
+        $user->notify(new PasswordResetByAdminNotification($newPassword));
+        
+        // Log the action
+        AuditLogger::log(
+            'user.password_reset',
+            auth()->user(),
+            null,
+            [
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'user_email' => $user->email,
+            ]
+        );
+        
+        return response()->json([
+            'message' => 'Password reset successfully. The new password has been sent to the user\'s email.'
+        ]);
+    }
+
+    /**
+     * Delete a user
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
+     * 
+     * This method deletes a user.
+     * Before deletion, it:
+     * - Prevents deleting yourself
+     * - Clears the user's primary_admin_id from any hotels if they are an admin
+     * - Logs the deletion
+     * 
+     * The user is permanently deleted from the database.
+     */
+    public function destroy(int $id)
+    {
+        try {
+            $user = User::findOrFail($id);
+            
+            // Prevent deleting yourself
+            if ($user->id === auth()->id()) {
+                return response()->json([
+                    'message' => 'You cannot delete your own account'
+                ], 422);
+            }
+
+            // Store user info before deletion for logging
+            $userId = $user->id;
+            $userName = $user->name;
+            $userHotelId = $user->hotel_id;
+            $userRole = $user->role;
+
+            // If user is an admin and is primary admin of any hotel, clear that relationship
+            if ($userRole === \App\Enums\UserRole::ADMIN) {
+                $hotelsWithThisAdmin = \App\Models\Hotel::where('primary_admin_id', $user->id)->get();
+                foreach ($hotelsWithThisAdmin as $hotel) {
+                    $hotel->primary_admin_id = null;
+                    $hotel->save();
+                }
+            }
+
+            // Log the deletion before deleting the user
+            AuditLogger::log('user.deleted', auth()->user(), $userHotelId, [
+                'user_id' => $userId,
+                'user_name' => $userName,
+                'user_role' => $userRole->value,
+            ]);
+
+            // Delete the user
+            $user->delete();
+
+            return response()->json(['message' => 'User deleted successfully']);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'User not found',
+                'error' => "User with ID {$id} does not exist"
+            ], 404);
+        } catch (\Exception $e) {
+            \Log::error('User deletion error', [
+                'user_id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
+            return response()->json([
+                'message' => 'Failed to delete user',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred'
+            ], 500);
+        }
     }
 }
 

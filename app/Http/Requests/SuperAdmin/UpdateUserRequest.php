@@ -28,7 +28,18 @@ class UpdateUserRequest extends FormRequest
             'name' => ['sometimes', 'string', 'max:255'],
             'email' => ['sometimes', 'email', 'max:255', Rule::unique('users', 'email')->ignore($userId)],
             'password' => ['nullable', 'string', 'min:8'],
-            'role' => ['sometimes', Rule::in(['client', 'receptionist', 'manager', 'admin', 'superadmin', 'super_admin'])],
+            'role' => [
+                'sometimes',
+                Rule::in(['client', 'receptionist', 'manager', 'admin', 'superadmin', 'super_admin']),
+                function ($attribute, $value, $fail) {
+                    // Prevent changing a user's role TO client (clients must self-register)
+                    // But allow keeping existing client role if user is already a client
+                    $user = \App\Models\User::find($this->route('id'));
+                    if ($user && $user->role->value !== 'client' && $value === 'client') {
+                        $fail('Clients must self-register. You cannot assign the client role to existing users.');
+                    }
+                },
+            ],
             'hotel_id' => ['nullable', 'integer', 'exists:hotels,id'],
             'phone_number' => ['nullable', 'string', 'max:20'],
             'active' => ['sometimes', 'boolean'],
