@@ -34,9 +34,23 @@ class BackupService
             // Get the latest backup file from Spatie
             $backupPath = $this->getLatestBackupPath();
             
+            if (!$backupPath) {
+                throw new \Exception('Backup file not found after running backup command');
+            }
+            
+            // Use the configured backup disk (usually 'local' which points to storage/app/private)
+            $disk = env('BACKUP_DISK', 'local');
+            
             $backup->status = 'success';
             $backup->path = $backupPath;
-            $backup->size_bytes = Storage::disk(env('BACKUP_DISK', 'local'))->size($backupPath) ?? null;
+            
+            // Only get size if file exists
+            if (Storage::disk($disk)->exists($backupPath)) {
+                $backup->size_bytes = Storage::disk($disk)->size($backupPath);
+            } else {
+                $backup->size_bytes = null;
+            }
+            
             $backup->save();
 
             AuditLogger::logBackupCompleted('full', $backupPath, null, $user);
@@ -111,34 +125,49 @@ class BackupService
 
     /**
      * Get the latest backup file path from Spatie
-     * Spatie stores backups in storage/app/{disk}/laravel-backup/
+     * Spatie stores backups based on the configured disk
      */
     private function getLatestBackupPath(): ?string
     {
         $disk = env('BACKUP_DISK', 'local');
-        $backupPath = storage_path("app/{$disk}/laravel-backup");
         
-        if (!is_dir($backupPath)) {
-            // Fallback to old location for compatibility
-            $backupPath = storage_path('app/backups');
-            if (!is_dir($backupPath)) {
-                return null;
+        // Check multiple possible locations where Spatie might store backups
+        $possiblePaths = [
+            // Default Spatie location for 'private' disk
+            ['path' => storage_path('app/private/Laravel'), 'prefix' => 'private/Laravel/'],
+            // Default Spatie location for 'local' disk
+            ['path' => storage_path("app/{$disk}/Laravel"), 'prefix' => "{$disk}/Laravel/"],
+            // Alternative location
+            ['path' => storage_path("app/{$disk}/laravel-backup"), 'prefix' => "{$disk}/laravel-backup/"],
+            // Fallback to old location
+            ['path' => storage_path('app/backups'), 'prefix' => 'backups/'],
+        ];
+
+        foreach ($possiblePaths as $pathConfig) {
+            $backupPath = $pathConfig['path'];
+            if (is_dir($backupPath)) {
+                $files = glob($backupPath . '/*.zip');
+                if (!empty($files)) {
+                    // Sort by modification time, newest first
+                    usort($files, function ($a, $b) {
+                        return filemtime($b) - filemtime($a);
+                    });
+                    
+                    $filename = basename($files[0]);
+                    $prefix = $pathConfig['prefix'];
+                    
+                    // If using 'local' disk and path is in private/Laravel, 
+                    // the path should be relative to the disk root (Laravel/filename)
+                    if ($prefix === 'private/Laravel/' && $disk === 'local') {
+                        return 'Laravel/' . $filename;
+                    }
+                    
+                    return $prefix . $filename;
+                }
             }
-            $prefix = 'backups/';
-        } else {
-            $prefix = "{$disk}/laravel-backup/";
         }
 
-        $files = glob($backupPath . '/*.zip');
-        if (empty($files)) {
-            return null;
-        }
-
-        usort($files, function ($a, $b) {
-            return filemtime($b) - filemtime($a);
-        });
-
-        return $prefix . basename($files[0]);
+        return null;
     }
 }
 
