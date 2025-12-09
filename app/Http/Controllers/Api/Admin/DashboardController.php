@@ -8,7 +8,6 @@ use App\Models\Room;
 use App\Models\Reservation;
 use App\Models\User;
 use App\Enums\UserRole;
-use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
@@ -72,15 +71,19 @@ class DashboardController extends Controller
         $monthStart = now()->startOfMonth();
         $monthEnd = now()->endOfMonth();
         
-        $monthlyRevenue = Reservation::whereHas('room', function ($query) use ($hotelId) {
+        // Calculate revenue by fetching reservations and calculating nights in PHP (database-agnostic)
+        $reservations = Reservation::whereHas('room', function ($query) use ($hotelId) {
             $query->where('hotel_id', $hotelId);
         })
         ->where('status', 'confirmed')
         ->whereBetween('check_in', [$monthStart, $monthEnd])
-        ->join('rooms', 'reservations.room_id', '=', 'rooms.id')
-        ->where('rooms.hotel_id', $hotelId)
-        ->selectRaw('SUM(rooms.price * DATEDIFF(reservations.check_out, reservations.check_in)) as revenue')
-        ->value('revenue') ?? 0;
+        ->with('room')
+        ->get();
+        
+        $monthlyRevenue = $reservations->sum(function ($reservation) {
+            $nights = max(1, $reservation->check_in->diffInDays($reservation->check_out));
+            return $reservation->room->price * $nights;
+        });
 
         // Booking trends for last 6 months
         $bookingTrends = $this->getBookingTrends($hotelId);
@@ -206,15 +209,19 @@ class DashboardController extends Controller
             $monthStart = $now->copy()->subMonths($i)->startOfMonth();
             $monthEnd = $monthStart->copy()->endOfMonth();
             
-            $revenue = Reservation::whereHas('room', function ($query) use ($hotelId) {
+            // Calculate revenue by fetching reservations and calculating nights in PHP (database-agnostic)
+            $reservations = Reservation::whereHas('room', function ($query) use ($hotelId) {
                 $query->where('hotel_id', $hotelId);
             })
             ->where('status', 'confirmed')
             ->whereBetween('check_in', [$monthStart, $monthEnd])
-            ->join('rooms', 'reservations.room_id', '=', 'rooms.id')
-            ->where('rooms.hotel_id', $hotelId)
-            ->selectRaw('SUM(rooms.price * GREATEST(1, DATEDIFF(reservations.check_out, reservations.check_in))) as revenue')
-            ->value('revenue') ?? 0;
+            ->with('room')
+            ->get();
+            
+            $revenue = $reservations->sum(function ($reservation) {
+                $nights = max(1, $reservation->check_in->diffInDays($reservation->check_out));
+                return $reservation->room->price * $nights;
+            });
             
             $months[] = [
                 'month' => $monthStart->format('M'),
