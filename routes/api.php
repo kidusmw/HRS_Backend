@@ -15,6 +15,14 @@ use App\Http\Controllers\Api\SuperAdmin\LogController as SuperAdminLogController
 use App\Http\Controllers\Api\SuperAdmin\BackupController as SuperAdminBackupController;
 use App\Http\Controllers\Api\SuperAdmin\SettingsController as SuperAdminSettingsController;
 use App\Http\Controllers\Api\SuperAdmin\NotificationController as SuperAdminNotificationController;
+use App\Http\Controllers\Api\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Api\Admin\UserController as AdminUserManagementController;
+use App\Http\Controllers\Api\Admin\RoomController as AdminRoomController;
+use App\Http\Controllers\Api\Admin\ReservationController as AdminReservationController;
+use App\Http\Controllers\Api\Admin\PaymentController as AdminPaymentController;
+use App\Http\Controllers\Api\Admin\LogController as AdminLogController;
+use App\Http\Controllers\Api\Admin\BackupController as AdminBackupController;
+use App\Http\Controllers\Api\Admin\SettingsController as AdminSettingsController;
 
 /**
  * Public Routes
@@ -41,6 +49,56 @@ Route::middleware('auth:sanctum')->group(function () {
 // Legacy/admin-scoped routes (kept for compatibility)
 Route::middleware(['auth:sanctum', 'role:admin,superadmin'])->group(function () {
     Route::post('/staff', [UserController::class, 'store']);
+});
+
+/**
+ * Admin API
+ * Base: /api/admin/*
+ * All routes are hotel-scoped (automatically filtered by authenticated user's hotel_id)
+ */
+Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin'])->group(function () {
+    // Dashboard
+    Route::get('/dashboard/metrics', [AdminDashboardController::class, 'metrics']);
+
+    // Users (hotel-scoped)
+    Route::get('/users', [AdminUserManagementController::class, 'index']);
+    Route::post('/users', [AdminUserManagementController::class, 'store']);
+    Route::get('/users/{id}', [AdminUserManagementController::class, 'show']);
+    Route::put('/users/{id}', [AdminUserManagementController::class, 'update']);
+    Route::delete('/users/{id}', [AdminUserManagementController::class, 'destroy']);
+
+    // Rooms (hotel-scoped)
+    Route::get('/rooms', [AdminRoomController::class, 'index']);
+    Route::post('/rooms', [AdminRoomController::class, 'store']);
+    Route::get('/rooms/{id}', [AdminRoomController::class, 'show']);
+    Route::put('/rooms/{id}', [AdminRoomController::class, 'update']);
+    Route::delete('/rooms/{id}', [AdminRoomController::class, 'destroy']);
+
+    // Reservations (hotel-scoped)
+    Route::get('/reservations', [AdminReservationController::class, 'index']);
+    Route::post('/reservations', [AdminReservationController::class, 'store']);
+    Route::get('/reservations/{id}', [AdminReservationController::class, 'show']);
+    Route::put('/reservations/{id}', [AdminReservationController::class, 'update']);
+    Route::delete('/reservations/{id}', [AdminReservationController::class, 'destroy']);
+    Route::patch('/reservations/{id}/confirm', [AdminReservationController::class, 'confirm']);
+    Route::patch('/reservations/{id}/cancel', [AdminReservationController::class, 'cancel']);
+
+    // Payments (hotel-scoped)
+    Route::get('/payments', [AdminPaymentController::class, 'index']);
+    Route::get('/payments/{id}', [AdminPaymentController::class, 'show']);
+
+    // Logs (hotel-scoped)
+    Route::get('/logs', [AdminLogController::class, 'index']);
+    Route::get('/logs/{id}', [AdminLogController::class, 'show']);
+
+    // Backups (hotel-scoped)
+    Route::get('/backups', [AdminBackupController::class, 'index']);
+    Route::post('/backups', [AdminBackupController::class, 'store']);
+    Route::get('/backups/{id}/download', [AdminBackupController::class, 'download']);
+
+    // Settings (hotel-scoped)
+    Route::get('/settings', [AdminSettingsController::class, 'get']);
+    Route::put('/settings', [AdminSettingsController::class, 'update']);
 });
 
 /**
