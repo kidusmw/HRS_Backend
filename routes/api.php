@@ -18,7 +18,6 @@ use App\Http\Controllers\Api\SuperAdmin\NotificationController as SuperAdminNoti
 use App\Http\Controllers\Api\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Api\Admin\UserController as AdminUserManagementController;
 use App\Http\Controllers\Api\Admin\RoomController as AdminRoomController;
-use App\Http\Controllers\Api\Admin\ReservationController as AdminReservationController;
 use App\Http\Controllers\Api\Admin\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Api\Admin\LogController as AdminLogController;
 use App\Http\Controllers\Api\Admin\BackupController as AdminBackupController;
@@ -73,15 +72,6 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin'])->group(functi
     Route::get('/rooms/{id}', [AdminRoomController::class, 'show']);
     Route::put('/rooms/{id}', [AdminRoomController::class, 'update']);
     Route::delete('/rooms/{id}', [AdminRoomController::class, 'destroy']);
-
-    // Reservations (hotel-scoped)
-    Route::get('/reservations', [AdminReservationController::class, 'index']);
-    Route::post('/reservations', [AdminReservationController::class, 'store']);
-    Route::get('/reservations/{id}', [AdminReservationController::class, 'show']);
-    Route::put('/reservations/{id}', [AdminReservationController::class, 'update']);
-    Route::delete('/reservations/{id}', [AdminReservationController::class, 'destroy']);
-    Route::patch('/reservations/{id}/confirm', [AdminReservationController::class, 'confirm']);
-    Route::patch('/reservations/{id}/cancel', [AdminReservationController::class, 'cancel']);
 
     // Payments (hotel-scoped)
     Route::get('/payments', [AdminPaymentController::class, 'index']);
