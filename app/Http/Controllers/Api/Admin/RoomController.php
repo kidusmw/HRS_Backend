@@ -114,8 +114,8 @@ class RoomController extends Controller
         $validated = $request->validate([
             'type' => 'required|string|max:255',
             'price' => 'required|numeric|min:0',
-            'isAvailable' => 'sometimes|boolean',
-            'capacity' => 'required|integer|min:1',
+            'isAvailable' => 'sometimes|boolean', // Optional - availability managed by receptionists/managers
+            'capacity' => 'required|integer|min:1', // Number of rooms of this type
             'description' => 'nullable|string',
         ]);
 
@@ -123,8 +123,10 @@ class RoomController extends Controller
             'hotel_id' => $hotelId,
             'type' => $validated['type'],
             'price' => $validated['price'],
+            // is_available defaults to true for new rooms
+            // Availability is managed by receptionists/managers, not admins
             'is_available' => $validated['isAvailable'] ?? true,
-            'capacity' => $validated['capacity'],
+            'capacity' => $validated['capacity'], // Number of rooms of this type
             'description' => $validated['description'] ?? null,
         ]);
 
@@ -158,12 +160,13 @@ class RoomController extends Controller
         $validated = $request->validate([
             'type' => 'sometimes|string|max:255',
             'price' => 'sometimes|numeric|min:0',
-            'isAvailable' => 'sometimes|boolean',
-            'capacity' => 'sometimes|integer|min:1',
+            'isAvailable' => 'sometimes|boolean', // Optional - availability managed by receptionists/managers
+            'capacity' => 'sometimes|integer|min:1', // Number of rooms of this type
             'description' => 'nullable|string',
         ]);
 
         // Update fields
+        // Note: isAvailable is not updated by admins - it's managed by receptionists/managers
         if (isset($validated['type'])) {
             $room->type = $validated['type'];
         }
@@ -171,10 +174,12 @@ class RoomController extends Controller
             $room->price = $validated['price'];
         }
         if (isset($validated['isAvailable'])) {
+            // This field is kept for future use by receptionists/managers
+            // Admins don't send this field, but we keep the logic for consistency
             $room->is_available = $validated['isAvailable'];
         }
         if (isset($validated['capacity'])) {
-            $room->capacity = $validated['capacity'];
+            $room->capacity = $validated['capacity']; // Number of rooms of this type
         }
         if (isset($validated['description'])) {
             $room->description = $validated['description'];
