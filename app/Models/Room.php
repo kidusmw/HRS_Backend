@@ -46,5 +46,13 @@ class Room extends Model
     {
         return $this->hasMany(Reservation::class);
     }
+
+    /**
+     * Get images for this room
+     */
+    public function images(): HasMany
+    {
+        return $this->hasMany(RoomImage::class)->orderBy('display_order');
+    }
 }
 
