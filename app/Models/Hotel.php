@@ -65,6 +65,14 @@ class Hotel extends Model
     }
 
     /**
+     * Get images for this hotel.
+     */
+    public function images(): HasMany
+    {
+        return $this->hasMany(HotelImage::class)->orderBy('display_order');
+    }
+
+    /**
      * Get the primary admin user for this hotel
      */
     public function primaryAdmin(): BelongsTo

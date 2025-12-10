@@ -24,12 +24,7 @@ class HotelSetting extends Model
         'value',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'value' => 'array',
-        ];
-    }
+    // Keep value uncasted (can store scalar, json, or array as needed)
 
     /**
      * Get the hotel this setting belongs to
