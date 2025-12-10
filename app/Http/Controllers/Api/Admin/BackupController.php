@@ -111,6 +111,8 @@ class BackupController extends Controller
             ], 404);
         }
 
+        // Download the backup file from the database
+        // In the format of a binary large object. This is a file that is stored in the database.
         return Storage::disk('local')->download($backup->path);
     }
 }
