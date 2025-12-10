@@ -22,6 +22,8 @@ use App\Http\Controllers\Api\Admin\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Api\Admin\LogController as AdminLogController;
 use App\Http\Controllers\Api\Admin\BackupController as AdminBackupController;
 use App\Http\Controllers\Api\Admin\SettingsController as AdminSettingsController;
+use App\Http\Controllers\Api\Admin\HotelLogoController;
+use App\Http\Controllers\Api\Admin\HotelImageController as AdminHotelImageController;
 
 /**
  * Public Routes
@@ -86,9 +88,19 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin'])->group(functi
     Route::post('/backups', [AdminBackupController::class, 'store']);
     Route::get('/backups/{id}/download', [AdminBackupController::class, 'download']);
 
+    // Hotel images (hotel-scoped)
+    Route::get('/hotel-images', [AdminHotelImageController::class, 'index']);
+    Route::post('/hotel-images', [AdminHotelImageController::class, 'store']);
+    Route::put('/hotel-images/{id}', [AdminHotelImageController::class, 'update']);
+    Route::delete('/hotel-images/{id}', [AdminHotelImageController::class, 'destroy']);
+
     // Settings (hotel-scoped)
     Route::get('/settings', [AdminSettingsController::class, 'get']);
     Route::put('/settings', [AdminSettingsController::class, 'update']);
+
+    // Hotel Logo (hotel-scoped, file-only)
+    Route::get('/hotel-logo', [HotelLogoController::class, 'show']);
+    Route::post('/hotel-logo', [HotelLogoController::class, 'store']);
 });
 
 /**
