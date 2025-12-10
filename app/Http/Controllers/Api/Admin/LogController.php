@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\AuditLog;
 use App\Http\Resources\AuditLogResource;
+use App\Enums\UserRole;
 
 class LogController extends Controller
 {
@@ -30,7 +31,14 @@ class LogController extends Controller
         }
 
         // Start query with hotel scope - only logs for this hotel
-        $query = AuditLog::where('hotel_id', $hotelId)
+        // Explicitly ensure hotel_id is not null and matches the admin's hotel
+        // Exclude logs from super admin users - only show logs from hotel staff
+        $query = AuditLog::whereNotNull('hotel_id')
+            ->where('hotel_id', (int) $hotelId)
+            ->whereHas('user', function ($q) {
+                // Only show logs from hotel staff - exclude super admin users
+                $q->where('role', '!=', UserRole::SUPERADMIN->value);
+            })
             ->with(['user', 'hotel']);
 
         // Filter by user
@@ -82,7 +90,9 @@ class LogController extends Controller
         }
 
         // Get log and ensure it belongs to the admin's hotel
-        $log = AuditLog::where('hotel_id', $hotelId)
+        // Explicitly ensure hotel_id is not null and matches the admin's hotel
+        $log = AuditLog::whereNotNull('hotel_id')
+            ->where('hotel_id', (int) $hotelId)
             ->with(['user', 'hotel'])
             ->findOrFail($id);
 
