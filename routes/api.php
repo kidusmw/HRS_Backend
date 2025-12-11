@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\Auth\LoginController;
 use App\Http\Controllers\Api\Auth\LogoutController;
 use App\Http\Controllers\Api\Auth\VerifyEmailController;
 use App\Http\Controllers\Api\Auth\PasswordResetController;
+use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\SuperAdmin\DashboardController as SuperAdminDashboardController;
 use App\Http\Controllers\Api\SuperAdmin\UserController as SuperAdminUserController;
 use App\Http\Controllers\Api\SuperAdmin\HotelController as SuperAdminHotelController;
@@ -44,6 +45,11 @@ Route::post('/password/reset', [PasswordResetController::class, 'reset']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [LogoutController::class, 'logout']);
+
+    // Authenticated user profile
+    Route::get('/profile', [ProfileController::class, 'show']);
+    Route::put('/profile', [ProfileController::class, 'update']);
+    Route::put('/profile/password', [ProfileController::class, 'updatePassword']);
 
     // Protected routes for all authenticated users can be added here
 });

@@ -31,6 +31,7 @@ class User extends Authenticatable
         'hotel_id',
         'active',
         'phone_number',
+        'avatar_path',
     ];
 
     /**

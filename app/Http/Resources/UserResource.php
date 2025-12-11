@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Storage;
 
 class UserResource extends JsonResource
 {
@@ -22,6 +23,7 @@ class UserResource extends JsonResource
             'isActive' => $this->active,
             'lastActiveAt' => $this->created_at?->toIso8601String(),
             'phoneNumber' => $this->phone_number ?? null,
+            'avatarUrl' => $this->avatar_path ? Storage::url($this->avatar_path) : null,
         ];
     }
 }
