@@ -51,11 +51,23 @@ class ProfileController extends Controller
 
         // Replace avatar if a new file is provided
         if ($request->hasFile('avatar')) {
+            logger()->info('ProfileController: avatar upload detected', [
+                'user_id' => $user->id,
+                'original_name' => $request->file('avatar')->getClientOriginalName(),
+                'mime' => $request->file('avatar')->getMimeType(),
+                'size' => $request->file('avatar')->getSize(),
+            ]);
             if ($user->avatar_path) {
                 Storage::disk('public')->delete($user->avatar_path);
             }
             $path = $request->file('avatar')->store('avatars', 'public');
             $user->avatar_path = $path;
+        } else {
+            logger()->info('ProfileController: no avatar file present', [
+                'user_id' => $user->id,
+                'hasFile_avatar' => $request->hasFile('avatar'),
+                'input_keys' => array_keys($request->all()),
+            ]);
         }
 
         $user->save();

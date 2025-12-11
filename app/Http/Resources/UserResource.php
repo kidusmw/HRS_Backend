@@ -24,6 +24,9 @@ class UserResource extends JsonResource
             'lastActiveAt' => $this->created_at?->toIso8601String(),
             'phoneNumber' => $this->phone_number ?? null,
             'avatarUrl' => $this->avatar_path ? Storage::url($this->avatar_path) : null,
+            'emailVerifiedAt' => $this->email_verified_at?->toIso8601String(),
+            'createdAt' => $this->created_at?->toIso8601String(),
+            'updatedAt' => $this->updated_at?->toIso8601String(),
         ];
     }
 }
