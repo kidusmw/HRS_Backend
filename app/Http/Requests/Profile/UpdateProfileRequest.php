@@ -16,8 +16,8 @@ class UpdateProfileRequest extends FormRequest
         $userId = $this->user()->id ?? null;
 
         return [
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users,email,' . $userId,
+            'name' => 'sometimes|string|max:255',
+            'email' => 'sometimes|string|email|max:255|unique:users,email,' . $userId,
             'phoneNumber' => 'nullable|string|max:20',
             'avatar' => 'nullable|image|max:5120', // 5MB
             'removeAvatar' => 'sometimes|boolean',
