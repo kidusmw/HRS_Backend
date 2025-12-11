@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\Admin\SettingsController as AdminSettingsController
 use App\Http\Controllers\Api\Admin\HotelLogoController;
 use App\Http\Controllers\Api\Admin\HotelImageController as AdminHotelImageController;
 use App\Http\Controllers\Api\Admin\RoomImageController as AdminRoomImageController;
+use App\Http\Controllers\Api\Admin\NotificationController as AdminNotificationController;
 
 /**
  * Public Routes
@@ -114,6 +115,10 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin'])->group(functi
     // Hotel Logo (hotel-scoped, file-only)
     Route::get('/hotel-logo', [HotelLogoController::class, 'show']);
     Route::post('/hotel-logo', [HotelLogoController::class, 'store']);
+
+    // Notifications (hotel-scoped via audit logs)
+    Route::get('/notifications', [AdminNotificationController::class, 'index']);
+    Route::patch('/notifications/{id}/read', [AdminNotificationController::class, 'markRead']);
 });
 
 /**
