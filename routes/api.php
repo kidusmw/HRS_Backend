@@ -8,7 +8,7 @@ use App\Http\Controllers\Api\Auth\LoginController;
 use App\Http\Controllers\Api\Auth\LogoutController;
 use App\Http\Controllers\Api\Auth\VerifyEmailController;
 use App\Http\Controllers\Api\Auth\PasswordResetController;
-use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\Shared\ProfileController;
 use App\Http\Controllers\Api\SuperAdmin\DashboardController as SuperAdminDashboardController;
 use App\Http\Controllers\Api\SuperAdmin\UserController as SuperAdminUserController;
 use App\Http\Controllers\Api\SuperAdmin\HotelController as SuperAdminHotelController;
