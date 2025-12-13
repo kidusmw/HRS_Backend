@@ -35,6 +35,7 @@ use App\Http\Controllers\Api\Manager\BookingController as ManagerBookingControll
 use App\Http\Controllers\Api\Manager\ReportController as ManagerReportController;
 use App\Http\Controllers\Api\Manager\DashboardController as ManagerDashboardController;
 use App\Http\Controllers\Api\Manager\OccupancyController as ManagerOccupancyController;
+use App\Http\Controllers\Api\Manager\NotificationController as ManagerNotificationController;
 
 /**
  * Public Routes
@@ -160,6 +161,10 @@ Route::prefix('manager')->middleware(['auth:sanctum', 'role:manager'])->group(fu
 
     // Occupancy
     Route::get('/occupancy', [ManagerOccupancyController::class, 'show']);
+
+    // Notifications (hotel-scoped via audit logs)
+    Route::get('/notifications', [ManagerNotificationController::class, 'index']);
+    Route::patch('/notifications/{id}/read', [ManagerNotificationController::class, 'markRead']);
 });
 
 /**
