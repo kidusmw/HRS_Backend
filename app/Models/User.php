@@ -29,6 +29,7 @@ class User extends Authenticatable
         'password',
         'role',
         'hotel_id',
+        'supervisor_id',
         'active',
         'phone_number',
         'avatar_path',
@@ -65,6 +66,16 @@ class User extends Authenticatable
     public function hotel(): BelongsTo
     {
         return $this->belongsTo(Hotel::class);
+    }
+
+    public function supervisor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'supervisor_id');
+    }
+
+    public function subordinates(): HasMany
+    {
+        return $this->hasMany(User::class, 'supervisor_id');
     }
 
     public function auditLogs(): HasMany

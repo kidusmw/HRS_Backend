@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Enums\UserRole;
 use App\Http\Resources\UserResource;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
@@ -32,7 +33,7 @@ class UserController extends Controller
 
         $query = User::where('hotel_id', $hotelId)
             ->whereIn('role', [UserRole::RECEPTIONIST, UserRole::MANAGER])
-            ->with('hotel');
+            ->with(['hotel', 'supervisor']);
 
         // Search by name or email
         if ($search = $request->string('search')->toString()) {
@@ -79,7 +80,7 @@ class UserController extends Controller
         $staffUser = User::where('id', $id)
             ->where('hotel_id', $hotelId)
             ->whereIn('role', [UserRole::RECEPTIONIST, UserRole::MANAGER])
-            ->with('hotel')
+            ->with(['hotel', 'supervisor'])
             ->firstOrFail();
 
         return new UserResource($staffUser);
@@ -109,7 +110,18 @@ class UserController extends Controller
             'role' => 'required|string|in:manager,receptionist',
             'phoneNumber' => 'nullable|string|max:20',
             'active' => 'sometimes|boolean',
+            'supervisor_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('users', 'id')->where(function ($query) use ($hotelId) {
+                    $query->where('hotel_id', $hotelId)->where('role', UserRole::MANAGER);
+                }),
+            ],
         ]);
+
+        if ($validated['role'] === 'receptionist' && empty($validated['supervisor_id'])) {
+            return response()->json(['message' => 'Supervisor is required for receptionists'], 422);
+        }
 
         // Generate password if not provided
         $password = $validated['password'] ?? Str::random(12);
@@ -129,7 +141,12 @@ class UserController extends Controller
             'phone_number' => $validated['phoneNumber'] ?? null,
             'active' => $validated['active'] ?? true,
             'email_verified_at' => now(),
+            'supervisor_id' => $validated['role'] === 'receptionist'
+                ? ($validated['supervisor_id'] ?? null)
+                : null,
         ]);
+
+        $staffUser->load(['hotel', 'supervisor']);
 
         return (new UserResource($staffUser))->response()->setStatusCode(201);
     }
@@ -164,7 +181,19 @@ class UserController extends Controller
             'role' => 'sometimes|string|in:manager,receptionist',
             'phoneNumber' => 'nullable|string|max:20',
             'active' => 'sometimes|boolean',
+            'supervisor_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('users', 'id')->where(function ($query) use ($hotelId) {
+                    $query->where('hotel_id', $hotelId)->where('role', UserRole::MANAGER);
+                }),
+            ],
         ]);
+
+        $roleForValidation = $validated['role'] ?? $staffUser->role->value;
+        if ($roleForValidation === 'receptionist' && empty($validated['supervisor_id']) && !$staffUser->supervisor_id) {
+            return response()->json(['message' => 'Supervisor is required for receptionists'], 422);
+        }
 
         // Update fields
         if (isset($validated['name'])) {
@@ -189,9 +218,19 @@ class UserController extends Controller
         if (isset($validated['active'])) {
             $staffUser->active = $validated['active'];
         }
+        // Assign supervisor: only for receptionists; null otherwise
+        if ($staffUser->role === UserRole::RECEPTIONIST) {
+            // Prevent self-supervision
+            if (!empty($validated['supervisor_id']) && $validated['supervisor_id'] == $staffUser->id) {
+                return response()->json(['message' => 'User cannot supervise themselves'], 422);
+            }
+            $staffUser->supervisor_id = $validated['supervisor_id'] ?? $staffUser->supervisor_id;
+        } else {
+            $staffUser->supervisor_id = null;
+        }
 
         $staffUser->save();
-        $staffUser->load('hotel');
+        $staffUser->load(['hotel', 'supervisor']);
 
         return new UserResource($staffUser);
     }
