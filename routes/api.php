@@ -27,6 +27,15 @@ use App\Http\Controllers\Api\Admin\HotelLogoController;
 use App\Http\Controllers\Api\Admin\HotelImageController as AdminHotelImageController;
 use App\Http\Controllers\Api\Admin\RoomImageController as AdminRoomImageController;
 use App\Http\Controllers\Api\Admin\NotificationController as AdminNotificationController;
+use App\Http\Controllers\Api\Manager\EmployeeController as ManagerEmployeeController;
+use App\Http\Controllers\Api\Manager\AttendanceController as ManagerAttendanceController;
+use App\Http\Controllers\Api\Manager\OverrideController as ManagerOverrideController;
+use App\Http\Controllers\Api\Manager\AlertController as ManagerAlertController;
+use App\Http\Controllers\Api\Manager\BookingController as ManagerBookingController;
+use App\Http\Controllers\Api\Manager\ReportController as ManagerReportController;
+use App\Http\Controllers\Api\Manager\DashboardController as ManagerDashboardController;
+use App\Http\Controllers\Api\Manager\OccupancyController as ManagerOccupancyController;
+use App\Http\Controllers\Api\Manager\NotificationController as ManagerNotificationController;
 
 /**
  * Public Routes
@@ -119,6 +128,43 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin'])->group(functi
     // Notifications (hotel-scoped via audit logs)
     Route::get('/notifications', [AdminNotificationController::class, 'index']);
     Route::patch('/notifications/{id}/read', [AdminNotificationController::class, 'markRead']);
+});
+
+/**
+ * Manager API
+ * Base: /api/manager/*
+ * All routes are hotel-scoped to the authenticated manager's hotel_id
+ */
+Route::prefix('manager')->middleware(['auth:sanctum', 'role:manager'])->group(function () {
+    // Dashboard
+    Route::get('/dashboard', [ManagerDashboardController::class, 'show']);
+
+    // Employees (hotel-scoped, role=receptionist)
+    Route::get('/employees', [ManagerEmployeeController::class, 'index']);
+
+    // Attendance
+    Route::get('/attendance', [ManagerAttendanceController::class, 'index']);
+    Route::post('/attendance', [ManagerAttendanceController::class, 'store']);
+
+    // Overrides
+    Route::get('/overrides', [ManagerOverrideController::class, 'index']);
+    Route::post('/overrides', [ManagerOverrideController::class, 'store']);
+
+    // Alerts
+    Route::get('/alerts', [ManagerAlertController::class, 'index']);
+
+    // Bookings
+    Route::get('/bookings', [ManagerBookingController::class, 'index']);
+
+    // Reports
+    Route::get('/reports', [ManagerReportController::class, 'index']);
+
+    // Occupancy
+    Route::get('/occupancy', [ManagerOccupancyController::class, 'show']);
+
+    // Notifications (hotel-scoped via audit logs)
+    Route::get('/notifications', [ManagerNotificationController::class, 'index']);
+    Route::patch('/notifications/{id}/read', [ManagerNotificationController::class, 'markRead']);
 });
 
 /**
