@@ -36,6 +36,10 @@ use App\Http\Controllers\Api\Manager\ReportController as ManagerReportController
 use App\Http\Controllers\Api\Manager\DashboardController as ManagerDashboardController;
 use App\Http\Controllers\Api\Manager\OccupancyController as ManagerOccupancyController;
 use App\Http\Controllers\Api\Manager\NotificationController as ManagerNotificationController;
+use App\Http\Controllers\Api\Receptionist\DashboardController as ReceptionistDashboardController;
+use App\Http\Controllers\Api\Receptionist\RoomController as ReceptionistRoomController;
+use App\Http\Controllers\Api\Receptionist\ReservationController as ReceptionistReservationController;
+use App\Http\Controllers\Api\Receptionist\ReportController as ReceptionistReportController;
 
 /**
  * Public Routes
@@ -165,6 +169,31 @@ Route::prefix('manager')->middleware(['auth:sanctum', 'role:manager'])->group(fu
     // Notifications (hotel-scoped via audit logs)
     Route::get('/notifications', [ManagerNotificationController::class, 'index']);
     Route::patch('/notifications/{id}/read', [ManagerNotificationController::class, 'markRead']);
+});
+
+/**
+ * Receptionist API
+ * Base: /api/receptionist/*
+ * All routes are hotel-scoped to the authenticated receptionist's hotel_id
+ */
+Route::prefix('receptionist')->middleware(['auth:sanctum', 'role:receptionist'])->group(function () {
+    // Dashboard
+    Route::get('/dashboard', [ReceptionistDashboardController::class, 'show']);
+
+    // Rooms (hotel-scoped, view-only with status update)
+    Route::get('/rooms', [ReceptionistRoomController::class, 'index']);
+    Route::patch('/rooms/{id}/status', [ReceptionistRoomController::class, 'updateStatus']);
+
+    // Reservations (hotel-scoped)
+    Route::get('/reservations', [ReceptionistReservationController::class, 'index']);
+    Route::post('/reservations', [ReceptionistReservationController::class, 'store']); // Walk-in booking
+    Route::patch('/reservations/{id}/confirm', [ReceptionistReservationController::class, 'confirm']);
+    Route::patch('/reservations/{id}/cancel', [ReceptionistReservationController::class, 'cancel']);
+    Route::patch('/reservations/{id}/check-in', [ReceptionistReservationController::class, 'checkIn']);
+    Route::patch('/reservations/{id}/check-out', [ReceptionistReservationController::class, 'checkOut']);
+
+    // Reports (operational level)
+    Route::get('/reports', [ReceptionistReportController::class, 'index']);
 });
 
 /**

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\RoomStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -15,7 +16,7 @@ class Room extends Model
         'hotel_id',
         'type',
         'price',
-        'is_available',
+        'status',
         'capacity',
         'description',
     ];
@@ -24,11 +25,20 @@ class Room extends Model
     {
         return [
             'price' => 'decimal:2',
-            'is_available' => 'boolean',
+            'status' => RoomStatus::class,
             'capacity' => 'integer',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Get the is_available attribute (computed from status)
+     * This provides backward compatibility for code that still uses $room->is_available
+     */
+    public function getIsAvailableAttribute(): bool
+    {
+        return $this->status === RoomStatus::AVAILABLE;
     }
 
     /**
