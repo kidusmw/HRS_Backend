@@ -39,6 +39,7 @@ use App\Http\Controllers\Api\Manager\NotificationController as ManagerNotificati
 use App\Http\Controllers\Api\Receptionist\DashboardController as ReceptionistDashboardController;
 use App\Http\Controllers\Api\Receptionist\RoomController as ReceptionistRoomController;
 use App\Http\Controllers\Api\Receptionist\ReservationController as ReceptionistReservationController;
+use App\Http\Controllers\Api\Receptionist\ReportController as ReceptionistReportController;
 
 /**
  * Public Routes
@@ -190,6 +191,9 @@ Route::prefix('receptionist')->middleware(['auth:sanctum', 'role:receptionist'])
     Route::patch('/reservations/{id}/cancel', [ReceptionistReservationController::class, 'cancel']);
     Route::patch('/reservations/{id}/check-in', [ReceptionistReservationController::class, 'checkIn']);
     Route::patch('/reservations/{id}/check-out', [ReceptionistReservationController::class, 'checkOut']);
+
+    // Reports (operational level)
+    Route::get('/reports', [ReceptionistReportController::class, 'index']);
 });
 
 /**
