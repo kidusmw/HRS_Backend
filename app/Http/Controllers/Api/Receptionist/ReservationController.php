@@ -220,13 +220,14 @@ class ReservationController extends Controller
             $guestUser->save();
         }
 
-        // Create reservation
+        // Create reservation (walk-in booking)
         $reservation = Reservation::create([
             'room_id' => $room->id,
             'user_id' => $guestUser->id,
             'check_in' => $checkIn,
             'check_out' => $checkOut,
             'status' => 'confirmed', // Walk-ins are automatically confirmed
+            'is_walk_in' => true, // Mark as walk-in booking
             'guests' => 1, // Default, can be updated if needed
             'special_requests' => $request->input('specialRequests'),
         ]);

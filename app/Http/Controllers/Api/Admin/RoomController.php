@@ -125,23 +125,34 @@ class RoomController extends Controller
             'type' => 'required|string|max:255',
             'price' => 'required|numeric|min:0',
             'isAvailable' => 'sometimes|boolean', // Optional - availability managed by receptionists/managers
-            'capacity' => 'required|integer|min:1', // Number of rooms of this type
+            'capacity' => 'required|integer|min:1|max:100', // Number of rooms of this type to create
             'description' => 'nullable|string',
         ]);
 
-        $room = Room::create([
-            'hotel_id' => $hotelId,
-            'type' => $validated['type'],
-            'price' => $validated['price'],
-            // status defaults to available for new rooms
-            // Availability is managed by receptionists/managers, not admins
-            'status' => \App\Enums\RoomStatus::AVAILABLE,
-            'capacity' => $validated['capacity'], // Number of rooms of this type
-            'description' => $validated['description'] ?? null,
-        ]);
+        $numberOfRooms = $validated['capacity'];
+        $createdRooms = [];
+
+        // Create multiple rooms - each room gets its own auto-incrementing ID
+        // Each room will have the same type, price, and description
+        // Guest capacity defaults to 1 (can be updated later if needed)
+        for ($i = 0; $i < $numberOfRooms; $i++) {
+            $room = Room::create([
+                'hotel_id' => $hotelId,
+                'type' => $validated['type'],
+                'price' => $validated['price'],
+                // status defaults to available for new rooms
+                // Availability is managed by receptionists/managers, not admins
+                'status' => \App\Enums\RoomStatus::AVAILABLE,
+                'capacity' => 1, // Guest capacity per room (default to 1, can be updated later if needed)
+                'description' => $validated['description'] ?? null,
+            ]);
+            $createdRooms[] = $this->transformRoom($room);
+        }
 
         return response()->json([
-            'data' => $this->transformRoom($room)
+            'message' => "Successfully created {$numberOfRooms} room(s)",
+            'data' => $createdRooms,
+            'count' => count($createdRooms),
         ], 201);
     }
 

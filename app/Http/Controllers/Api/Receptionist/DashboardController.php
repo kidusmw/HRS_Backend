@@ -43,6 +43,7 @@ class DashboardController extends Controller
         $today = Carbon::today();
 
         // Today's arrivals (pending or confirmed reservations checking in today)
+        // Includes both regular bookings and walk-in bookings
         $todayArrivals = Reservation::with('room', 'user')
             ->whereHas('room', fn ($q) => $q->where('hotel_id', $hotelId))
             ->whereDate('check_in', $today)
@@ -50,6 +51,7 @@ class DashboardController extends Controller
             ->count();
 
         // Today's departures (checked-in guests checking out today)
+        // Includes both regular bookings and walk-in bookings
         $todayDepartures = Reservation::with('room', 'user')
             ->whereHas('room', fn ($q) => $q->where('hotel_id', $hotelId))
             ->whereDate('check_out', $today)
@@ -57,12 +59,14 @@ class DashboardController extends Controller
             ->count();
 
         // Currently in-house (checked-in guests)
+        // Includes both regular bookings and walk-in bookings
         $inHouse = Reservation::with('room', 'user')
             ->whereHas('room', fn ($q) => $q->where('hotel_id', $hotelId))
             ->where('status', 'checked_in')
             ->count();
 
         // Occupancy metrics
+        // Includes rooms occupied by both regular bookings and walk-in bookings
         $totalRooms = Room::where('hotel_id', $hotelId)->count();
         $occupiedRooms = Reservation::with('room')
             ->whereHas('room', fn ($q) => $q->where('hotel_id', $hotelId))

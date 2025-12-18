@@ -56,6 +56,7 @@ class ReportController extends Controller
         $endDateStr = $end->toDateString();
 
         // Get arrivals (check-ins during the period)
+        // Includes both regular bookings and walk-in bookings
         $arrivals = Reservation::with(['room', 'user'])
             ->whereHas('room', fn ($q) => $q->where('hotel_id', $hotelId))
             ->whereBetween('check_in', [$startDateStr, $endDateStr])
@@ -64,6 +65,7 @@ class ReportController extends Controller
             ->get();
 
         // Get departures (check-outs during the period)
+        // Includes both regular bookings and walk-in bookings
         $departures = Reservation::with(['room', 'user'])
             ->whereHas('room', fn ($q) => $q->where('hotel_id', $hotelId))
             ->whereBetween('check_out', [$startDateStr, $endDateStr])
@@ -72,6 +74,7 @@ class ReportController extends Controller
             ->get();
 
         // Get in-house guests (currently checked in)
+        // Includes both regular bookings and walk-in bookings
         $inHouse = Reservation::with(['room', 'user'])
             ->whereHas('room', fn ($q) => $q->where('hotel_id', $hotelId))
             ->where('status', 'checked_in')
@@ -79,6 +82,7 @@ class ReportController extends Controller
             ->get();
 
         // Calculate occupancy metrics
+        // Includes rooms occupied by both regular bookings and walk-in bookings
         $totalRooms = Room::where('hotel_id', $hotelId)->count();
         $occupiedRooms = Room::where('hotel_id', $hotelId)
             ->where('status', RoomStatus::OCCUPIED)
@@ -90,7 +94,7 @@ class ReportController extends Controller
             ? round(($occupiedRooms / $totalRooms) * 100, 1) 
             : 0;
 
-        // Transform arrivals
+        // Transform arrivals (includes walk-in bookings)
         $arrivalsList = $arrivals->map(function ($reservation) {
             return [
                 'id' => $reservation->id,
@@ -98,20 +102,22 @@ class ReportController extends Controller
                 'roomNumber' => (string) ($reservation->room->id ?? 'N/A'),
                 'checkIn' => $reservation->check_in->toDateString(),
                 'status' => $reservation->status,
+                'isWalkIn' => $reservation->is_walk_in ?? false,
             ];
         })->toArray();
 
-        // Transform departures
+        // Transform departures (includes walk-in bookings)
         $departuresList = $departures->map(function ($reservation) {
             return [
                 'id' => $reservation->id,
                 'guestName' => $reservation->user->name ?? 'Guest',
                 'roomNumber' => (string) ($reservation->room->id ?? 'N/A'),
                 'checkOut' => $reservation->check_out->toDateString(),
+                'isWalkIn' => $reservation->is_walk_in ?? false,
             ];
         })->toArray();
 
-        // Transform in-house
+        // Transform in-house (includes walk-in bookings)
         $inHouseList = $inHouse->map(function ($reservation) {
             return [
                 'id' => $reservation->id,
@@ -119,6 +125,7 @@ class ReportController extends Controller
                 'roomNumber' => (string) ($reservation->room->id ?? 'N/A'),
                 'checkIn' => $reservation->check_in->toDateString(),
                 'checkOut' => $reservation->check_out->toDateString(),
+                'isWalkIn' => $reservation->is_walk_in ?? false,
             ];
         })->toArray();
 
