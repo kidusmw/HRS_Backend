@@ -52,9 +52,9 @@ class RoomController extends Controller
             $query->where('type', $type);
         }
 
-        // Filter by availability status
-        if (!is_null($request->input('isAvailable'))) {
-            $query->where('is_available', filter_var($request->input('isAvailable'), FILTER_VALIDATE_BOOLEAN));
+        // Filter by status
+        if ($status = $request->string('status')->toString()) {
+            $query->where('status', $status);
         }
 
         $rooms = $query->orderBy('type')->paginate($request->integer('per_page', 15));
@@ -121,7 +121,7 @@ class RoomController extends Controller
             ], 404);
         }
 
-        $oldStatus = $room->is_available ? 'available' : 'unavailable';
+        $oldStatus = $room->status?->value ?? 'available';
         
         // Validate status update
         $validator = Validator::make($request->all(), [
@@ -142,13 +142,13 @@ class RoomController extends Controller
 
         $newStatus = $request->input('status');
         
-        // Map status to is_available field
-        // Note: The Room model uses is_available boolean
-        // - available -> is_available = true
-        // - occupied/maintenance/unavailable -> is_available = false
-        // The transformRoom method will check for active reservations to determine if it's "occupied"
-        // vs "unavailable" or "maintenance"
-        $isAvailable = ($newStatus === 'available');
+        // Validate status value
+        $validStatuses = ['available', 'unavailable', 'occupied', 'maintenance'];
+        if (!in_array($newStatus, $validStatuses)) {
+            return response()->json([
+                'message' => 'Invalid status. Must be one of: ' . implode(', ', $validStatuses)
+            ], 422);
+        }
         
         // If setting to occupied, check if there's actually an active reservation
         if ($newStatus === 'occupied') {
@@ -168,7 +168,8 @@ class RoomController extends Controller
             }
         }
         
-        $room->is_available = $isAvailable;
+        // Update status field
+        $room->status = \App\Enums\RoomStatus::from($newStatus);
         $room->save();
 
         Log::info('Receptionist room status updated successfully', [
@@ -177,7 +178,6 @@ class RoomController extends Controller
             'room_id' => $id,
             'old_status' => $oldStatus,
             'new_status' => $newStatus,
-            'is_available' => $isAvailable,
         ]);
 
         return response()->json([
@@ -193,17 +193,8 @@ class RoomController extends Controller
      */
     private function transformRoom(Room $room): array
     {
-        // Determine status based on is_available and any active reservations
-        $status = 'available';
-        if (!$room->is_available) {
-            // Check if room has active checked-in reservation
-            $hasActiveReservation = $room->reservations()
-                ->where('status', 'checked_in')
-                ->where('check_out', '>=', now())
-                ->exists();
-            
-            $status = $hasActiveReservation ? 'occupied' : 'unavailable';
-        }
+        // Status is now the source of truth
+        $status = $room->status?->value ?? 'available';
 
         return [
             'id' => $room->id,
@@ -213,7 +204,7 @@ class RoomController extends Controller
             'capacity' => $room->capacity,
             'description' => $room->description,
             'status' => $status,
-            'isAvailable' => $room->is_available,
+            'isAvailable' => $room->is_available, // Computed accessor from status
             'createdAt' => $room->created_at?->toIso8601String(),
             'updatedAt' => $room->updated_at?->toIso8601String(),
         ];

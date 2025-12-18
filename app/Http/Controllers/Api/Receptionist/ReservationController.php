@@ -142,11 +142,12 @@ class ReservationController extends Controller
         }
 
         // Check if room is available
-        if (!$room->is_available) {
+        if ($room->status !== \App\Enums\RoomStatus::AVAILABLE) {
             Log::warning('Receptionist attempted walk-in reservation for unavailable room', [
                 'receptionist_id' => $receptionist->id,
                 'hotel_id' => $hotelId,
                 'room_id' => $room->id,
+                'room_status' => $room->status?->value,
             ]);
             return response()->json([
                 'message' => 'Room is not available'
@@ -426,18 +427,18 @@ class ReservationController extends Controller
         $reservation->status = 'checked_in';
         $reservation->save();
 
-        // Update room status to occupied (if room has is_available field)
+        // Update room status to occupied
         $room = $reservation->room;
         if ($room) {
-            $oldRoomStatus = $room->is_available;
-            $room->is_available = false;
+            $oldRoomStatus = $room->status?->value ?? 'available';
+            $room->status = \App\Enums\RoomStatus::OCCUPIED;
             $room->save();
 
             Log::info('Room status updated during check-in', [
                 'receptionist_id' => $receptionist->id,
                 'hotel_id' => $hotelId,
                 'room_id' => $room->id,
-                'old_room_status' => $oldRoomStatus ? 'available' : 'unavailable',
+                'old_room_status' => $oldRoomStatus,
                 'new_room_status' => 'occupied',
             ]);
         }
@@ -503,10 +504,10 @@ class ReservationController extends Controller
         $reservation->status = 'checked_out';
         $reservation->save();
 
-        // Update room status back to available
+        // Update room status back to available (if no other active reservations)
         $room = $reservation->room;
         if ($room) {
-            $oldRoomStatus = $room->is_available;
+            $oldRoomStatus = $room->status?->value ?? 'available';
             
             // Check if room has other active reservations
             $hasOtherActiveReservations = Reservation::where('room_id', $room->id)
@@ -515,15 +516,18 @@ class ReservationController extends Controller
                 ->where('check_out', '>=', now())
                 ->exists();
 
-            $room->is_available = !$hasOtherActiveReservations;
+            // Set room status based on whether there are other active reservations
+            $room->status = $hasOtherActiveReservations 
+                ? \App\Enums\RoomStatus::OCCUPIED 
+                : \App\Enums\RoomStatus::AVAILABLE;
             $room->save();
 
             Log::info('Room status updated during check-out', [
                 'receptionist_id' => $receptionist->id,
                 'hotel_id' => $hotelId,
                 'room_id' => $room->id,
-                'old_room_status' => $oldRoomStatus ? 'available' : 'unavailable',
-                'new_room_status' => $room->is_available ? 'available' : 'unavailable',
+                'old_room_status' => $oldRoomStatus,
+                'new_room_status' => $room->status->value,
                 'has_other_active_reservations' => $hasOtherActiveReservations,
             ]);
         }

@@ -70,7 +70,7 @@ class DashboardController extends Controller
             ->distinct('room_id')
             ->count('room_id');
         $availableRooms = Room::where('hotel_id', $hotelId)
-            ->where('is_available', true)
+            ->where('status', \App\Enums\RoomStatus::AVAILABLE)
             ->count();
         $occupancyRate = $totalRooms > 0 ? round(($occupiedRooms / $totalRooms) * 100, 1) : 0;
 

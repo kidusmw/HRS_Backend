@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
+use App\Enums\RoomStatus;
 use App\Models\Hotel;
 use App\Models\Room;
 use App\Models\Reservation;
@@ -72,7 +73,7 @@ class SampleDataSeeder extends Seeder
                     'hotel_id' => $hotel->id,
                     'type' => $i <= 3 ? 'Standard' : ($i <= 7 ? 'Deluxe' : 'Suite'),
                     'price' => $i <= 3 ? 100.00 : ($i <= 7 ? 150.00 : 250.00),
-                    'is_available' => $i % 3 !== 0,
+                    'status' => ($i % 3 !== 0) ? RoomStatus::AVAILABLE : RoomStatus::UNAVAILABLE,
                     'capacity' => $i <= 7 ? 2 : 4,
                     'description' => "Comfortable {$hotel->name} room",
                 ]);

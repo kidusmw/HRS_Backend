@@ -43,9 +43,19 @@ class RoomController extends Controller
             $query->where('type', $type);
         }
 
-        // Filter by availability status
+        // Filter by status
+        if ($status = $request->string('status')->toString()) {
+            $query->where('status', $status);
+        }
+        
+        // Also support legacy isAvailable filter for backward compatibility (maps to status)
         if (!is_null($request->input('isAvailable'))) {
-            $query->where('is_available', filter_var($request->input('isAvailable'), FILTER_VALIDATE_BOOLEAN));
+            $isAvailable = filter_var($request->input('isAvailable'), FILTER_VALIDATE_BOOLEAN);
+            if ($isAvailable) {
+                $query->where('status', \App\Enums\RoomStatus::AVAILABLE);
+            } else {
+                $query->where('status', '!=', \App\Enums\RoomStatus::AVAILABLE);
+            }
         }
 
         $rooms = $query->orderBy('type')->paginate($request->integer('per_page', 15));
@@ -123,9 +133,9 @@ class RoomController extends Controller
             'hotel_id' => $hotelId,
             'type' => $validated['type'],
             'price' => $validated['price'],
-            // is_available defaults to true for new rooms
+            // status defaults to available for new rooms
             // Availability is managed by receptionists/managers, not admins
-            'is_available' => $validated['isAvailable'] ?? true,
+            'status' => \App\Enums\RoomStatus::AVAILABLE,
             'capacity' => $validated['capacity'], // Number of rooms of this type
             'description' => $validated['description'] ?? null,
         ]);
@@ -160,23 +170,21 @@ class RoomController extends Controller
         $validated = $request->validate([
             'type' => 'sometimes|string|max:255',
             'price' => 'sometimes|numeric|min:0',
-            'isAvailable' => 'sometimes|boolean', // Optional - availability managed by receptionists/managers
+            'status' => 'sometimes|string|in:available,unavailable,occupied,maintenance', // Optional - status managed by receptionists/managers
             'capacity' => 'sometimes|integer|min:1', // Number of rooms of this type
             'description' => 'nullable|string',
         ]);
 
         // Update fields
-        // Note: isAvailable is not updated by admins - it's managed by receptionists/managers
+        // Note: status is not typically updated by admins - it's managed by receptionists/managers
         if (isset($validated['type'])) {
             $room->type = $validated['type'];
         }
         if (isset($validated['price'])) {
             $room->price = $validated['price'];
         }
-        if (isset($validated['isAvailable'])) {
-            // This field is kept for future use by receptionists/managers
-            // Admins don't send this field, but we keep the logic for consistency
-            $room->is_available = $validated['isAvailable'];
+        if (isset($validated['status'])) {
+            $room->status = \App\Enums\RoomStatus::from($validated['status']);
         }
         if (isset($validated['capacity'])) {
             $room->capacity = $validated['capacity']; // Number of rooms of this type
@@ -243,7 +251,8 @@ class RoomController extends Controller
             'hotelId' => $room->hotel_id,
             'type' => $room->type,
             'price' => (float) $room->price,
-            'isAvailable' => $room->is_available,
+            'status' => $room->status?->value ?? 'available',
+            'isAvailable' => $room->is_available, // Computed accessor from status
             'capacity' => $room->capacity,
             'description' => $room->description,
             'createdAt' => $room->created_at?->toIso8601String(),

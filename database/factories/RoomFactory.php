@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\RoomStatus;
 use App\Models\Hotel;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -21,7 +22,7 @@ class RoomFactory extends Factory
             'hotel_id' => Hotel::factory(),
             'type' => fake()->randomElement(['Standard', 'Deluxe', 'Suite']),
             'price' => fake()->randomFloat(2, 50, 500),
-            'is_available' => fake()->boolean(80),
+            'status' => fake()->randomElement([RoomStatus::AVAILABLE, RoomStatus::AVAILABLE, RoomStatus::AVAILABLE, RoomStatus::UNAVAILABLE]), // 75% available
             'capacity' => fake()->numberBetween(1, 6),
             'description' => fake()->sentence(),
         ];
