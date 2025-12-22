@@ -37,26 +37,75 @@ class DashboardController extends Controller
         // Calculate KPIs
         $totalRooms = Room::where('hotel_id', $hotelId)->count();
         
-        // Occupied rooms (confirmed reservations that are currently active)
+        // Occupied rooms: rooms with checked_in status OR confirmed reservations that are currently active
+        // This matches the receptionist dashboard logic
         $occupiedRooms = Reservation::whereHas('room', function ($query) use ($hotelId) {
             $query->where('hotel_id', $hotelId);
         })
-        ->where('status', 'confirmed')
-        ->where('check_in', '<=', now())
-        ->where('check_out', '>=', now())
+        ->where(function ($query) {
+            // Currently checked-in guests
+            $query->where('status', 'checked_in')
+                  // OR confirmed reservations that are currently active (check-in <= today <= check-out)
+                  ->orWhere(function ($q) {
+                      $q->where('status', 'confirmed')
+                        ->where('check_in', '<=', now())
+                        ->where('check_out', '>=', now());
+                  });
+        })
         ->distinct('room_id')
         ->count('room_id');
         
-        $availableRooms = max(0, $totalRooms - $occupiedRooms);
+        // Available rooms: rooms with status = 'available' (using room status enum)
+        // This is more accurate than subtracting, as it accounts for maintenance/unavailable rooms
+        $availableRooms = Room::where('hotel_id', $hotelId)
+            ->where('status', \App\Enums\RoomStatus::AVAILABLE)
+            ->count();
+        
         $occupancyPct = $totalRooms > 0 ? round(($occupiedRooms / $totalRooms) * 100, 1) : 0;
 
-        // Active reservations today (confirmed reservations that include today)
+        // Calculate last month's occupancy for comparison (same day last month)
+        // This provides a fair comparison - what was occupancy on this exact day last month?
+        $sameDayLastMonth = now()->subMonth();
+        $lastMonthOccupiedRooms = Reservation::whereHas('room', function ($query) use ($hotelId) {
+            $query->where('hotel_id', $hotelId);
+        })
+        ->where(function ($query) use ($sameDayLastMonth) {
+            // Calculate occupancy for the same day last month using the same logic
+            $query->where(function ($q) use ($sameDayLastMonth) {
+                // Checked-in guests on that day
+                $q->where('status', 'checked_in')
+                  ->where('check_in', '<=', $sameDayLastMonth)
+                  ->where('check_out', '>=', $sameDayLastMonth);
+            })->orWhere(function ($q) use ($sameDayLastMonth) {
+                // Confirmed reservations active on that day
+                $q->where('status', 'confirmed')
+                  ->where('check_in', '<=', $sameDayLastMonth)
+                  ->where('check_out', '>=', $sameDayLastMonth);
+            });
+        })
+        ->distinct('room_id')
+        ->count('room_id');
+        
+        $lastMonthOccupancyPct = $totalRooms > 0 ? round(($lastMonthOccupiedRooms / $totalRooms) * 100, 1) : 0;
+        
+        // Calculate occupancy change from last month
+        $occupancyChange = $occupancyPct - $lastMonthOccupancyPct;
+        $occupancyChangeFormatted = $occupancyChange >= 0 
+            ? '+' . number_format($occupancyChange, 1) 
+            : number_format($occupancyChange, 1);
+
+        // Active reservations today (checked_in OR confirmed reservations that include today)
         $activeReservationsToday = Reservation::whereHas('room', function ($query) use ($hotelId) {
             $query->where('hotel_id', $hotelId);
         })
-        ->where('status', 'confirmed')
-        ->where('check_in', '<=', now())
-        ->where('check_out', '>=', now())
+        ->where(function ($query) {
+            $query->where('status', 'checked_in')
+                  ->orWhere(function ($q) {
+                      $q->where('status', 'confirmed')
+                        ->where('check_in', '<=', now())
+                        ->where('check_out', '>=', now());
+                  });
+        })
         ->count();
 
         // Upcoming check-ins (reservations with check_in date today or in the next 7 days)
@@ -97,6 +146,8 @@ class DashboardController extends Controller
         return response()->json([
             'kpis' => [
                 'occupancyPct' => $occupancyPct,
+                'occupancyChangeFromLastMonth' => $occupancyChange,
+                'occupancyChangeFormatted' => $occupancyChangeFormatted,
                 'roomsAvailable' => $availableRooms,
                 'activeReservationsToday' => $activeReservationsToday,
                 'upcomingCheckins' => $upcomingCheckins,
@@ -157,26 +208,35 @@ class DashboardController extends Controller
             }
             
             // Count rooms that have active reservations during this week
+            // Include both checked_in and confirmed reservations
             $occupiedRooms = Reservation::whereHas('room', function ($query) use ($hotelId) {
                 $query->where('hotel_id', $hotelId);
             })
-            ->where('status', 'confirmed')
             ->where(function ($query) use ($currentWeekStart, $weekEnd) {
-                $query->where(function ($q) use ($currentWeekStart, $weekEnd) {
-                    // Reservation starts in this week
-                    $q->whereBetween('check_in', [$currentWeekStart, $weekEnd]);
-                })->orWhere(function ($q) use ($currentWeekStart, $weekEnd) {
-                    // Reservation ends in this week
-                    $q->whereBetween('check_out', [$currentWeekStart, $weekEnd]);
-                })->orWhere(function ($q) use ($currentWeekStart, $weekEnd) {
-                    // Reservation spans the entire week
-                    $q->where('check_in', '<=', $currentWeekStart)
-                      ->where('check_out', '>=', $weekEnd);
-                });
+                // Checked-in guests (always count as occupied)
+                $query->where('status', 'checked_in')
+                      // OR confirmed reservations that overlap with this week
+                      ->orWhere(function ($q) use ($currentWeekStart, $weekEnd) {
+                          $q->where('status', 'confirmed')
+                            ->where(function ($subQ) use ($currentWeekStart, $weekEnd) {
+                                // Reservation starts in this week
+                                $subQ->whereBetween('check_in', [$currentWeekStart, $weekEnd])
+                                     // OR reservation ends in this week
+                                     ->orWhereBetween('check_out', [$currentWeekStart, $weekEnd])
+                                     // OR reservation spans the entire week
+                                     ->orWhere(function ($spanQ) use ($currentWeekStart, $weekEnd) {
+                                         $spanQ->where('check_in', '<=', $currentWeekStart)
+                                               ->where('check_out', '>=', $weekEnd);
+                                     });
+                            });
+                      });
             })
             ->distinct('room_id')
             ->count('room_id');
             
+            // Calculate available rooms for this week using room status
+            // For weekly view, we'll use the same logic: total - occupied
+            // But we could also filter by room status if needed
             $availableRooms = max(0, $totalRooms - $occupiedRooms);
             
             $weeks[] = [
