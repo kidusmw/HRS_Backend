@@ -17,6 +17,7 @@ class Reservation extends Model
         'check_out',
         'status',
         'is_walk_in',
+        'payment_method',
         'guests',
         'special_requests',
     ];
@@ -46,6 +47,7 @@ class Reservation extends Model
             'check_out',
             'status',
             'is_walk_in',
+            'payment_method',
             'guests',
             'special_requests',
             'created_at',

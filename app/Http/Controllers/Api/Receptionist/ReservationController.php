@@ -103,6 +103,15 @@ class ReservationController extends Controller
             ], 400);
         }
 
+        // Log incoming request data for debugging
+        Log::info('Receptionist walk-in reservation request received', [
+            'receptionist_id' => $receptionist->id,
+            'hotel_id' => $hotelId,
+            'request_data' => $request->all(),
+            'paymentMethod_raw' => $request->input('paymentMethod'),
+            'payment_method_raw' => $request->input('payment_method'),
+        ]);
+
         $validator = Validator::make($request->all(), [
             'guestName' => 'required|string|max:255',
             'guestEmail' => 'nullable|email|max:255',
@@ -110,6 +119,7 @@ class ReservationController extends Controller
             'roomNumber' => 'required|integer|exists:rooms,id',
             'checkIn' => 'required|date|after_or_equal:today',
             'checkOut' => 'required|date|after:checkIn',
+            'paymentMethod' => 'required|string|in:cash,transfer',
             'specialRequests' => 'nullable|string|max:1000',
         ]);
 
@@ -220,6 +230,22 @@ class ReservationController extends Controller
             $guestUser->save();
         }
 
+        // Get payment method - try both camelCase and snake_case
+        $paymentMethod = $request->input('paymentMethod') ?? $request->input('payment_method');
+        
+        if (!$paymentMethod || !in_array($paymentMethod, ['cash', 'transfer'])) {
+            Log::error('Invalid or missing payment method in walk-in reservation', [
+                'receptionist_id' => $receptionist->id,
+                'hotel_id' => $hotelId,
+                'paymentMethod' => $request->input('paymentMethod'),
+                'payment_method' => $request->input('payment_method'),
+                'all_input' => $request->all(),
+            ]);
+            return response()->json([
+                'message' => 'Payment method is required and must be either cash or transfer'
+            ], 422);
+        }
+
         // Create reservation (walk-in booking)
         $reservation = Reservation::create([
             'room_id' => $room->id,
@@ -228,8 +254,17 @@ class ReservationController extends Controller
             'check_out' => $checkOut,
             'status' => 'confirmed', // Walk-ins are automatically confirmed
             'is_walk_in' => true, // Mark as walk-in booking
+            'payment_method' => $paymentMethod, // cash or transfer
             'guests' => 1, // Default, can be updated if needed
             'special_requests' => $request->input('specialRequests'),
+        ]);
+
+        Log::info('Receptionist walk-in reservation created with payment method', [
+            'receptionist_id' => $receptionist->id,
+            'hotel_id' => $hotelId,
+            'reservation_id' => $reservation->id,
+            'payment_method' => $reservation->payment_method,
+            'payment_method_from_db' => $reservation->fresh()->payment_method,
         ]);
 
         Log::info('Receptionist walk-in reservation created successfully', [

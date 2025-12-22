@@ -180,9 +180,19 @@ class PaymentController extends Controller
         // Get currency from system settings (set by super admin)
         $currency = SystemSetting::getValue('default_currency', 'USD');
 
-        // Get payment method from system settings (first available method)
-        // Note: In the future, when reservations store payment_method, use that instead
+        // Get payment method
+        // For walk-in bookings, use the payment_method from the reservation
+        // Otherwise, use the default from system settings
         $paymentMethod = $this->getDefaultPaymentMethod();
+        
+        if ($reservation->is_walk_in && $reservation->payment_method) {
+            // Map walk-in payment methods to PaymentMethod enum values
+            $paymentMethodMap = [
+                'cash' => 'cash',
+                'transfer' => 'bank_transfer',
+            ];
+            $paymentMethod = $paymentMethodMap[$reservation->payment_method] ?? $paymentMethod;
+        }
 
         return [
             'id' => $reservation->id, // Using reservation ID as payment ID
@@ -192,7 +202,7 @@ class PaymentController extends Controller
             'guestEmail' => $reservation->user?->email,
             'amount' => $amount,
             'currency' => $currency, // From system settings (set by super admin)
-            'paymentMethod' => $paymentMethod, // From system settings (set by super admin)
+            'paymentMethod' => $paymentMethod, // From walk-in booking payment_method if available, otherwise from system settings
             'status' => $paymentStatus,
             'transactionId' => $transactionId,
             'paidAt' => $reservation->created_at->toIso8601String(),
