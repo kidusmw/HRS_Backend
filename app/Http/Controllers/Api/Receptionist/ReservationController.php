@@ -7,6 +7,7 @@ use App\Models\Reservation;
 use App\Models\Room;
 use App\Models\User;
 use App\Enums\UserRole;
+use App\Services\AuditLogger;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -277,6 +278,17 @@ class ReservationController extends Controller
             'check_out' => $checkOut->toDateString(),
         ]);
 
+        // Create audit log for walk-in booking
+        AuditLogger::log('reservation.walk_in.created', $receptionist, $hotelId, [
+            'reservation_id' => $reservation->id,
+            'room_id' => $room->id,
+            'guest_user_id' => $guestUser->id,
+            'check_in' => $checkIn->toDateString(),
+            'check_out' => $checkOut->toDateString(),
+            'payment_method' => $paymentMethod,
+            'is_walk_in' => true,
+        ]);
+
         $reservation->load(['room', 'user']);
 
         return response()->json([
@@ -338,6 +350,14 @@ class ReservationController extends Controller
             'guest_user_id' => $reservation->user_id,
         ]);
 
+        // Create audit log for confirmation
+        AuditLogger::log('reservation.confirmed', $receptionist, $hotelId, [
+            'reservation_id' => $id,
+            'room_id' => $reservation->room_id,
+            'old_status' => $oldStatus,
+            'new_status' => 'confirmed',
+        ]);
+
         $reservation->load(['room', 'user']);
 
         return response()->json([
@@ -397,6 +417,14 @@ class ReservationController extends Controller
             'new_status' => 'cancelled',
             'room_id' => $reservation->room_id,
             'guest_user_id' => $reservation->user_id,
+        ]);
+
+        // Create audit log for cancellation
+        AuditLogger::log('reservation.cancelled', $receptionist, $hotelId, [
+            'reservation_id' => $id,
+            'room_id' => $reservation->room_id,
+            'old_status' => $oldStatus,
+            'new_status' => 'cancelled',
         ]);
 
         $reservation->load(['room', 'user']);
@@ -489,6 +517,14 @@ class ReservationController extends Controller
             'guest_user_id' => $reservation->user_id,
         ]);
 
+        // Create audit log for check-in
+        AuditLogger::log('reservation.checked_in', $receptionist, $hotelId, [
+            'reservation_id' => $id,
+            'room_id' => $reservation->room_id,
+            'old_status' => $oldStatus,
+            'new_status' => 'checked_in',
+        ]);
+
         $reservation->load(['room', 'user']);
 
         return response()->json([
@@ -576,6 +612,14 @@ class ReservationController extends Controller
             'new_status' => 'checked_out',
             'room_id' => $reservation->room_id,
             'guest_user_id' => $reservation->user_id,
+        ]);
+
+        // Create audit log for check-out
+        AuditLogger::log('reservation.checked_out', $receptionist, $hotelId, [
+            'reservation_id' => $id,
+            'room_id' => $reservation->room_id,
+            'old_status' => $oldStatus,
+            'new_status' => 'checked_out',
         ]);
 
         $reservation->load(['room', 'user']);

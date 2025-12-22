@@ -54,9 +54,24 @@ class OverrideController extends Controller
             return response()->json(['message' => 'Reservation not in your hotel'], 403);
         }
 
+        $oldStatus = $reservation->status;
+
+        // Actually update the reservation status
+        $reservation->status = $data['new_status'];
+        $reservation->save();
+
+        // Create override record for audit trail
         $override = ReservationOverride::create([
             'reservation_id' => $reservation->id,
             'manager_id' => $manager->id,
+            'new_status' => $data['new_status'],
+            'note' => $data['note'] ?? null,
+        ]);
+
+        // Create audit log for the override
+        \App\Services\AuditLogger::log('reservation.override', $manager, $hotelId, [
+            'reservation_id' => $reservation->id,
+            'old_status' => $oldStatus,
             'new_status' => $data['new_status'],
             'note' => $data['note'] ?? null,
         ]);

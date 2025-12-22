@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Receptionist;
 
 use App\Http\Controllers\Controller;
 use App\Models\Room;
+use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -175,6 +176,13 @@ class RoomController extends Controller
         Log::info('Receptionist room status updated successfully', [
             'receptionist_id' => $user->id,
             'hotel_id' => $hotelId,
+            'room_id' => $id,
+            'old_status' => $oldStatus,
+            'new_status' => $newStatus,
+        ]);
+
+        // Create audit log for room status update
+        AuditLogger::log('room.status.updated', $user, $hotelId, [
             'room_id' => $id,
             'old_status' => $oldStatus,
             'new_status' => $newStatus,
