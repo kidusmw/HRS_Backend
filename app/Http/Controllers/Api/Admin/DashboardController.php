@@ -55,10 +55,30 @@ class DashboardController extends Controller
         ->distinct('room_id')
         ->count('room_id');
         
-        // Available rooms: rooms with status = 'available' (using room status enum)
-        // This is more accurate than subtracting, as it accounts for maintenance/unavailable rooms
+        // Available rooms: rooms with status = 'available' that are NOT reserved/occupied
+        // A room is available for booking only if:
+        // 1. Room status is 'available' (not maintenance/unavailable)
+        // 2. AND the room doesn't have an active reservation (checked_in OR confirmed with today in date range)
+        $roomsWithActiveReservations = Reservation::whereHas('room', function ($query) use ($hotelId) {
+            $query->where('hotel_id', $hotelId);
+        })
+        ->where(function ($query) {
+            // Currently checked-in guests
+            $query->where('status', 'checked_in')
+                  // OR confirmed reservations that are currently active (check-in <= today <= check-out)
+                  ->orWhere(function ($q) {
+                      $q->where('status', 'confirmed')
+                        ->where('check_in', '<=', now())
+                        ->where('check_out', '>=', now());
+                  });
+        })
+        ->pluck('room_id')
+        ->unique()
+        ->toArray();
+        
         $availableRooms = Room::where('hotel_id', $hotelId)
             ->where('status', \App\Enums\RoomStatus::AVAILABLE)
+            ->whereNotIn('id', $roomsWithActiveReservations)
             ->count();
         
         $occupancyPct = $totalRooms > 0 ? round(($occupiedRooms / $totalRooms) * 100, 1) : 0;
