@@ -137,21 +137,34 @@ class DashboardController extends Controller
         ->count();
 
         // Monthly revenue (current month)
+        // Revenue should include all reservations that have nights in the current month,
+        // regardless of when they started or ended, and regardless of status (confirmed, checked_in, checked_out)
         $monthStart = now()->startOfMonth();
         $monthEnd = now()->endOfMonth();
         
-        // Calculate revenue by fetching reservations and calculating nights in PHP (database-agnostic)
+        // Get all reservations that overlap with the current month
+        // A reservation overlaps if: check_in <= monthEnd AND check_out >= monthStart
         $reservations = Reservation::whereHas('room', function ($query) use ($hotelId) {
             $query->where('hotel_id', $hotelId);
         })
-        ->where('status', 'confirmed')
-        ->whereBetween('check_in', [$monthStart, $monthEnd])
+        ->where('check_in', '<=', $monthEnd)
+        ->where('check_out', '>=', $monthStart)
+        ->whereIn('status', ['confirmed', 'checked_in', 'checked_out']) // Only count completed/active reservations
         ->with('room')
         ->get();
         
-        $monthlyRevenue = $reservations->sum(function ($reservation) {
-            $nights = max(1, $reservation->check_in->diffInDays($reservation->check_out));
-            return $reservation->room->price * $nights;
+        // Calculate revenue based on nights that fall within the current month
+        $monthlyRevenue = $reservations->sum(function ($reservation) use ($monthStart, $monthEnd) {
+            $roomPrice = $reservation->room->price ?? 0;
+            
+            // Calculate the overlap between reservation dates and current month
+            $overlapStart = max($reservation->check_in, $monthStart);
+            $overlapEnd = min($reservation->check_out, $monthEnd);
+            
+            // Calculate nights in the overlap period
+            $nights = max(1, $overlapStart->diffInDays($overlapEnd));
+            
+            return $roomPrice * $nights;
         });
 
         // Booking trends for last 6 months
@@ -289,18 +302,29 @@ class DashboardController extends Controller
             $monthStart = $now->copy()->subMonths($i)->startOfMonth();
             $monthEnd = $monthStart->copy()->endOfMonth();
             
-            // Calculate revenue by fetching reservations and calculating nights in PHP (database-agnostic)
+            // Calculate revenue by fetching reservations that overlap with the month
+            // Include all reservations that have nights in this month, regardless of start/end dates
             $reservations = Reservation::whereHas('room', function ($query) use ($hotelId) {
                 $query->where('hotel_id', $hotelId);
             })
-            ->where('status', 'confirmed')
-            ->whereBetween('check_in', [$monthStart, $monthEnd])
+            ->where('check_in', '<=', $monthEnd)
+            ->where('check_out', '>=', $monthStart)
+            ->whereIn('status', ['confirmed', 'checked_in', 'checked_out']) // Only count completed/active reservations
             ->with('room')
             ->get();
             
-            $revenue = $reservations->sum(function ($reservation) {
-                $nights = max(1, $reservation->check_in->diffInDays($reservation->check_out));
-                return $reservation->room->price * $nights;
+            // Calculate revenue based on nights that fall within this month
+            $revenue = $reservations->sum(function ($reservation) use ($monthStart, $monthEnd) {
+                $roomPrice = $reservation->room->price ?? 0;
+                
+                // Calculate the overlap between reservation dates and this month
+                $overlapStart = max($reservation->check_in, $monthStart);
+                $overlapEnd = min($reservation->check_out, $monthEnd);
+                
+                // Calculate nights in the overlap period
+                $nights = max(1, $overlapStart->diffInDays($overlapEnd));
+                
+                return $roomPrice * $nights;
             });
             
             $months[] = [
