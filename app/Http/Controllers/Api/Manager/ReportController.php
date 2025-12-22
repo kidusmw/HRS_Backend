@@ -47,15 +47,19 @@ class ReportController extends Controller
         $days = max(1, $start->diffInDays($end) + 1);
         $roomsCount = Room::where('hotel_id', $hotelId)->count();
 
+        // Get reservations that overlap with the date range
+        // A reservation overlaps if: check_in <= end AND check_out >= start
         $reservations = Reservation::with('room')
             ->whereHas('room', function ($q) use ($hotelId) {
                 $q->where('hotel_id', $hotelId);
             })
-            ->whereDate('check_in', '<=', $end)
-            ->whereDate('check_out', '>=', $start)
+            ->where('check_in', '<=', $end->endOfDay())
+            ->where('check_out', '>=', $start->startOfDay())
             ->get();
 
-        $activeStatuses = ['confirmed', 'checked_in', 'checked_out'];
+        // Active statuses for revenue/occupancy: confirmed and checked_in
+        // Note: checked_out reservations should only count up to their checkout date
+        $activeStatuses = ['confirmed', 'checked_in'];
         $revenue = 0;
         $occupiedNights = 0;
         $cancellations = 0;
@@ -66,14 +70,45 @@ class ReportController extends Controller
         foreach ($reservations as $res) {
             $roomPrice = $res->room->price ?? 0;
             $roomType = $res->room->type ?? 'Unknown';
-            $source = $res->source ?? 'web';
-            $overlapStart = Carbon::parse($res->check_in)->max($start);
-            $overlapEnd = Carbon::parse($res->check_out)->min($end);
-            $nights = max(0, $overlapStart->diffInDays($overlapEnd));
-
-            $totalBookings++;
-
-            if (in_array($res->status, $activeStatuses, true)) {
+            // Determine source: walk-in bookings use 'walk-in', others default to 'web'
+            $source = $res->is_walk_in ? 'walk-in' : ($res->source ?? 'web');
+            
+            // Calculate overlap between reservation dates and report date range
+            $resCheckIn = Carbon::parse($res->check_in)->startOfDay();
+            $resCheckOut = Carbon::parse($res->check_out)->startOfDay();
+            
+            // Overlap period: from max(start, check_in) to min(end, check_out)
+            $overlapStart = $resCheckIn->max($start->copy()->startOfDay());
+            $overlapEnd = $resCheckOut->min($end->copy()->startOfDay());
+            
+            // Calculate nights: difference in days
+            // If same day (check-in = check-out), that's 1 night
+            // Otherwise, diffInDays gives the number of nights
+            $nightsDiff = $overlapStart->diffInDays($overlapEnd);
+            $nights = $overlapStart->eq($overlapEnd) ? 1 : max(1, $nightsDiff);
+            
+            // For checked_out reservations, only count nights up to checkout date
+            // For active reservations (confirmed/checked_in), count all overlap nights
+            if ($res->status === 'checked_out') {
+                // Only count if checkout date is within or after the report start
+                if ($resCheckOut->gte($start->startOfDay())) {
+                    // Recalculate nights for checked_out: only count up to checkout date
+                    $checkedOutOverlapStart = $resCheckIn->max($start->copy()->startOfDay());
+                    $checkedOutOverlapEnd = $resCheckOut->min($end->copy()->startOfDay());
+                    $checkedOutNightsDiff = $checkedOutOverlapStart->diffInDays($checkedOutOverlapEnd);
+                    $checkedOutNights = $checkedOutOverlapStart->eq($checkedOutOverlapEnd) ? 1 : max(1, $checkedOutNightsDiff);
+                    
+                    $occupiedNights += $checkedOutNights;
+                    $revenue += $roomPrice * $checkedOutNights;
+                    
+                    // Track revenue by room type
+                    if (!isset($revenueByRoomType[$roomType])) {
+                        $revenueByRoomType[$roomType] = 0;
+                    }
+                    $revenueByRoomType[$roomType] += $roomPrice * $checkedOutNights;
+                }
+            } elseif (in_array($res->status, $activeStatuses, true)) {
+                // For confirmed/checked_in reservations, count all overlap nights
                 $occupiedNights += $nights;
                 $revenue += $roomPrice * $nights;
                 
@@ -83,6 +118,8 @@ class ReportController extends Controller
                 }
                 $revenueByRoomType[$roomType] += $roomPrice * $nights;
             }
+
+            $totalBookings++;
 
             if ($res->status === 'cancelled') {
                 $cancellations++;
@@ -104,9 +141,22 @@ class ReportController extends Controller
         $revpar = $availableRoomNights > 0 ? round($revenue / $availableRoomNights, 2) : 0;
 
         // Calculate rooms occupied/available for the date range
-        // This is an approximation: average occupied rooms per day
-        $roomsOccupied = min($roomsCount, (int) ceil($occupiedNights / $days));
-        $roomsAvailable = max(0, $roomsCount - $roomsOccupied);
+        // For a date range, we calculate the average occupied rooms per day
+        // This gives a more accurate representation than a single day snapshot
+        $avgOccupiedRoomsPerDay = $days > 0 ? ($occupiedNights / $days) : 0;
+        $roomsOccupied = min($roomsCount, (int) round($avgOccupiedRoomsPerDay));
+        
+        // Calculate available rooms: total rooms minus occupied, but also account for room status
+        // Rooms in maintenance/unavailable should not be counted as available
+        $roomsInMaintenance = Room::where('hotel_id', $hotelId)
+            ->where('status', \App\Enums\RoomStatus::MAINTENANCE)
+            ->count();
+        $roomsUnavailable = Room::where('hotel_id', $hotelId)
+            ->where('status', \App\Enums\RoomStatus::UNAVAILABLE)
+            ->count();
+        
+        // Available rooms = total - occupied - maintenance - unavailable
+        $roomsAvailable = max(0, $roomsCount - $roomsOccupied - $roomsInMaintenance - $roomsUnavailable);
 
         // Format revenue by room type
         $revenueByRoomTypeFormatted = array_map(function ($type, $rev) {
