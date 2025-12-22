@@ -36,6 +36,7 @@ use App\Http\Controllers\Api\Manager\ReportController as ManagerReportController
 use App\Http\Controllers\Api\Manager\DashboardController as ManagerDashboardController;
 use App\Http\Controllers\Api\Manager\OccupancyController as ManagerOccupancyController;
 use App\Http\Controllers\Api\Manager\NotificationController as ManagerNotificationController;
+use App\Http\Controllers\Api\Manager\ActivityController as ManagerActivityController;
 use App\Http\Controllers\Api\Receptionist\DashboardController as ReceptionistDashboardController;
 use App\Http\Controllers\Api\Receptionist\RoomController as ReceptionistRoomController;
 use App\Http\Controllers\Api\Receptionist\ReservationController as ReceptionistReservationController;
@@ -169,6 +170,9 @@ Route::prefix('manager')->middleware(['auth:sanctum', 'role:manager'])->group(fu
     // Notifications (hotel-scoped via audit logs)
     Route::get('/notifications', [ManagerNotificationController::class, 'index']);
     Route::patch('/notifications/{id}/read', [ManagerNotificationController::class, 'markRead']);
+
+    // Activities (receptionist activities)
+    Route::get('/activities', [ManagerActivityController::class, 'index']);
 });
 
 /**
