@@ -51,7 +51,42 @@ class BookingController extends Controller
 
         $bookings = $query->orderByDesc('created_at')->paginate($perPage);
 
-        return response()->json($bookings);
+        // Calculate status counts for all bookings (not just current page)
+        // This helps the frontend display accurate summary cards
+        $statusCounts = [
+            'pending' => Reservation::whereHas('room', function ($q) use ($hotelId) {
+                $q->where('hotel_id', $hotelId);
+            })->where('status', 'pending')->count(),
+            'confirmed' => Reservation::whereHas('room', function ($q) use ($hotelId) {
+                $q->where('hotel_id', $hotelId);
+            })->where('status', 'confirmed')->count(),
+            'checked_in' => Reservation::whereHas('room', function ($q) use ($hotelId) {
+                $q->where('hotel_id', $hotelId);
+            })->where('status', 'checked_in')->count(),
+            'checked_out' => Reservation::whereHas('room', function ($q) use ($hotelId) {
+                $q->where('hotel_id', $hotelId);
+            })->where('status', 'checked_out')->count(),
+            'cancelled' => Reservation::whereHas('room', function ($q) use ($hotelId) {
+                $q->where('hotel_id', $hotelId);
+            })->where('status', 'cancelled')->count(),
+        ];
+
+        // Calculate total active bookings (pending + confirmed + checked_in)
+        $totalActive = $statusCounts['pending'] + $statusCounts['confirmed'] + $statusCounts['checked_in'];
+
+        return response()->json([
+            'data' => $bookings->items(),
+            'meta' => [
+                'current_page' => $bookings->currentPage(),
+                'from' => $bookings->firstItem(),
+                'last_page' => $bookings->lastPage(),
+                'per_page' => $bookings->perPage(),
+                'to' => $bookings->lastItem(),
+                'total' => $bookings->total(),
+            ],
+            'status_counts' => $statusCounts,
+            'total_active' => $totalActive,
+        ]);
     }
 }
 
