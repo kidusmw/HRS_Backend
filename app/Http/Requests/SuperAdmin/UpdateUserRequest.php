@@ -30,7 +30,7 @@ class UpdateUserRequest extends FormRequest
             'password' => ['nullable', 'string', 'min:8'],
             'role' => [
                 'sometimes',
-                Rule::in(['client', 'receptionist', 'manager', 'admin', 'superadmin', 'super_admin']),
+                Rule::in(['client', 'admin', 'superadmin', 'super_admin']),
                 function ($attribute, $value, $fail) {
                     // Prevent changing a user's role TO client (clients must self-register)
                     // But allow keeping existing client role if user is already a client
