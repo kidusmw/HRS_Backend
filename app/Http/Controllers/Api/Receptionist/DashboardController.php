@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Receptionist;
 use App\Http\Controllers\Controller;
 use App\Models\Reservation;
 use App\Models\Room;
+use App\Enums\RoomStatus;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -66,15 +67,13 @@ class DashboardController extends Controller
             ->count();
 
         // Occupancy metrics
-        // Includes rooms occupied by both regular bookings and walk-in bookings
+        // Calculate based on room status to match Reports page
         $totalRooms = Room::where('hotel_id', $hotelId)->count();
-        $occupiedRooms = Reservation::with('room')
-            ->whereHas('room', fn ($q) => $q->where('hotel_id', $hotelId))
-            ->where('status', 'checked_in')
-            ->distinct('room_id')
-            ->count('room_id');
+        $occupiedRooms = Room::where('hotel_id', $hotelId)
+            ->where('status', RoomStatus::OCCUPIED)
+            ->count();
         $availableRooms = Room::where('hotel_id', $hotelId)
-            ->where('status', \App\Enums\RoomStatus::AVAILABLE)
+            ->where('status', RoomStatus::AVAILABLE)
             ->count();
         $occupancyRate = $totalRooms > 0 ? round(($occupiedRooms / $totalRooms) * 100, 1) : 0;
 

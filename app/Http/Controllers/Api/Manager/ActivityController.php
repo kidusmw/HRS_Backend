@@ -25,10 +25,18 @@ class ActivityController extends Controller
         }
 
         // Query audit logs from receptionist users in this hotel
+        // Only show booking/reservation related activities
         $query = AuditLog::with(['user', 'hotel'])
             ->where('hotel_id', $hotelId)
             ->whereHas('user', function ($q) {
                 $q->where('role', UserRole::RECEPTIONIST->value);
+            })
+            ->where(function ($q) {
+                // Filter to only show activities related to reservations/bookings
+                // All booking-related actions from receptionists start with 'reservation.'
+                $q->where('action', 'like', 'reservation.%')
+                  ->orWhere('action', 'like', '%reservation%')
+                  ->orWhere('action', 'like', '%booking%');
             })
             ->orderBy('timestamp', 'desc');
 
@@ -37,6 +45,14 @@ class ActivityController extends Controller
             $query->where(function ($q) use ($bookingId) {
                 $q->whereJsonContains('meta->reservation_id', $bookingId)
                   ->orWhereJsonContains('meta->booking_id', $bookingId);
+            });
+        }
+
+        // Filter by receptionist name if provided
+        if ($receptionistName = $request->string('receptionist_name')->toString()) {
+            $query->whereHas('user', function ($q) use ($receptionistName) {
+                $q->where('role', UserRole::RECEPTIONIST->value)
+                  ->where('name', 'like', "%{$receptionistName}%");
             });
         }
 
