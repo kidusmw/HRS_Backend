@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Alert;
 use App\Models\Reservation;
 use App\Models\Room;
+use App\Enums\RoomStatus;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -36,19 +37,22 @@ class DashboardController extends Controller
         }
 
         $today = Carbon::today();
+        
+        // Calculate occupancy metrics based on room status to match receptionist pages
         $roomsCount = Room::where('hotel_id', $hotelId)->count();
+        $occupiedRoomsToday = Room::where('hotel_id', $hotelId)
+            ->where('status', RoomStatus::OCCUPIED)
+            ->count();
+        $occupancyPct = $roomsCount > 0 ? round(($occupiedRoomsToday / $roomsCount) * 100, 2) : 0;
 
+        // Get active reservations for today (for activeReservationsToday metric)
         $activeStatuses = ['confirmed', 'checked_in', 'checked_out'];
-
         $todayReservations = Reservation::with('room')
             ->whereHas('room', fn ($q) => $q->where('hotel_id', $hotelId))
             ->whereDate('check_in', '<=', $today)
             ->whereDate('check_out', '>=', $today)
             ->whereIn('status', $activeStatuses)
             ->get();
-
-        $occupiedRoomsToday = $todayReservations->pluck('room_id')->unique()->count();
-        $occupancyPct = $roomsCount > 0 ? round(($occupiedRoomsToday / $roomsCount) * 100, 2) : 0;
 
         $bookingsTrend = $this->buildBookingsTrend($hotelId, 6);
         $revenueTrend = $this->buildRevenueTrend($hotelId, 6);
@@ -58,7 +62,9 @@ class DashboardController extends Controller
         return response()->json([
             'kpis' => [
                 'occupancyPct' => $occupancyPct,
-                'roomsAvailable' => max(0, $roomsCount - $occupiedRoomsToday),
+                'roomsAvailable' => Room::where('hotel_id', $hotelId)
+                    ->where('status', RoomStatus::AVAILABLE)
+                    ->count(),
                 'activeReservationsToday' => $todayReservations->count(),
                 'upcomingCheckins' => Reservation::whereHas('room', fn ($q) => $q->where('hotel_id', $hotelId))
                     ->whereDate('check_in', $today)

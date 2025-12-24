@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Manager;
 use App\Http\Controllers\Controller;
 use App\Models\Reservation;
 use App\Models\Room;
+use App\Enums\RoomStatus;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -33,29 +34,29 @@ class OccupancyController extends Controller
         $tomorrow = $today->copy()->addDay();
         $roomsCount = Room::where('hotel_id', $hotelId)->count();
 
-        $activeStatuses = ['confirmed', 'checked_in', 'checked_out'];
-
-        // Calculate occupancy for today
-        $todayOccupied = Reservation::whereHas('room', fn ($q) => $q->where('hotel_id', $hotelId))
-            ->whereIn('status', $activeStatuses)
-            ->whereDate('check_in', '<=', $today)
-            ->whereDate('check_out', '>=', $today)
+        // Calculate occupancy for today based on room status to match receptionist pages
+        $todayOccupied = Room::where('hotel_id', $hotelId)
+            ->where('status', RoomStatus::OCCUPIED)
             ->count();
-
-        $todayAvailable = max(0, $roomsCount - $todayOccupied);
+        $todayAvailable = Room::where('hotel_id', $hotelId)
+            ->where('status', RoomStatus::AVAILABLE)
+            ->count();
         $todayRate = $roomsCount > 0 ? round(($todayOccupied / $roomsCount) * 100, 2) : 0;
 
-        // Calculate occupancy for tomorrow
-        $tomorrowOccupied = Reservation::whereHas('room', fn ($q) => $q->where('hotel_id', $hotelId))
+        // Calculate occupancy for tomorrow based on reservations (prediction)
+        // Note: Tomorrow is a prediction, so we use reservation-based calculation
+        $activeStatuses = ['confirmed', 'checked_in', 'checked_out'];
+        $tomorrowReservations = Reservation::whereHas('room', fn ($q) => $q->where('hotel_id', $hotelId))
             ->whereIn('status', $activeStatuses)
             ->whereDate('check_in', '<=', $tomorrow)
             ->whereDate('check_out', '>=', $tomorrow)
-            ->count();
-
+            ->get();
+        $tomorrowOccupied = $tomorrowReservations->pluck('room_id')->unique()->count();
         $tomorrowAvailable = max(0, $roomsCount - $tomorrowOccupied);
         $tomorrowRate = $roomsCount > 0 ? round(($tomorrowOccupied / $roomsCount) * 100, 2) : 0;
 
-        // Calculate occupancy for this week (average)
+        // Calculate occupancy for this week (average based on reservations)
+        // Note: This week is a prediction/average, so we use reservation-based calculation
         $weekStart = $today->copy()->startOfWeek();
         $weekEnd = $today->copy()->endOfWeek();
         $weekDays = $weekStart->diffInDays($weekEnd) + 1;
