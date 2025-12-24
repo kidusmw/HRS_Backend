@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Manager;
 use App\Http\Controllers\Controller;
 use App\Models\Reservation;
 use App\Models\Room;
+use App\Enums\RoomStatus;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -140,23 +141,14 @@ class ReportController extends Controller
         $adr = $occupiedNights > 0 ? round($revenue / $occupiedNights, 2) : 0;
         $revpar = $availableRoomNights > 0 ? round($revenue / $availableRoomNights, 2) : 0;
 
-        // Calculate rooms occupied/available for the date range
-        // For a date range, we calculate the average occupied rooms per day
-        // This gives a more accurate representation than a single day snapshot
-        $avgOccupiedRoomsPerDay = $days > 0 ? ($occupiedNights / $days) : 0;
-        $roomsOccupied = min($roomsCount, (int) round($avgOccupiedRoomsPerDay));
-        
-        // Calculate available rooms: total rooms minus occupied, but also account for room status
-        // Rooms in maintenance/unavailable should not be counted as available
-        $roomsInMaintenance = Room::where('hotel_id', $hotelId)
-            ->where('status', \App\Enums\RoomStatus::MAINTENANCE)
+        // Calculate rooms occupied/available based on room status to match receptionist pages
+        // This provides current state rather than historical average
+        $roomsOccupied = Room::where('hotel_id', $hotelId)
+            ->where('status', RoomStatus::OCCUPIED)
             ->count();
-        $roomsUnavailable = Room::where('hotel_id', $hotelId)
-            ->where('status', \App\Enums\RoomStatus::UNAVAILABLE)
+        $roomsAvailable = Room::where('hotel_id', $hotelId)
+            ->where('status', RoomStatus::AVAILABLE)
             ->count();
-        
-        // Available rooms = total - occupied - maintenance - unavailable
-        $roomsAvailable = max(0, $roomsCount - $roomsOccupied - $roomsInMaintenance - $roomsUnavailable);
 
         // Format revenue by room type
         $revenueByRoomTypeFormatted = array_map(function ($type, $rev) {
