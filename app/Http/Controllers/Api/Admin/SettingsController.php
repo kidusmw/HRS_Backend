@@ -48,10 +48,7 @@ class SettingsController extends Controller
             'checkOutTime' => HotelSetting::getValue($hotelId, 'check_out_time', '11:00'),
             'cancellationHours' => (int) HotelSetting::getValue($hotelId, 'cancellation_hours', 24),
             'allowOnlineBooking' => (bool) HotelSetting::getValue($hotelId, 'allow_online_booking', true),
-            'requireDeposit' => (bool) HotelSetting::getValue($hotelId, 'require_deposit', false),
-            'depositPercentage' => (float) HotelSetting::getValue($hotelId, 'deposit_percentage', 0),
             'emailNotifications' => (bool) HotelSetting::getValue($hotelId, 'email_notifications', true),
-            'smsNotifications' => (bool) HotelSetting::getValue($hotelId, 'sms_notifications', false),
         ];
 
         return response()->json(['data' => $settings]);
@@ -88,10 +85,7 @@ class SettingsController extends Controller
             'check_out_time' => $request->input('checkOutTime'),
             'cancellation_hours' => $request->filled('cancellationHours') ? (int) $request->input('cancellationHours') : null,
             'allow_online_booking' => $parseBool('allowOnlineBooking'),
-            'require_deposit' => $parseBool('requireDeposit'),
-            'deposit_percentage' => $request->filled('depositPercentage') ? (float) $request->input('depositPercentage') : null,
             'email_notifications' => $parseBool('emailNotifications'),
-            'sms_notifications' => $parseBool('smsNotifications'),
         ];
 
         // Save each setting (direct upsert to ensure persistence)

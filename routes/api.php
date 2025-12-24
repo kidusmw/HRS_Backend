@@ -239,6 +239,7 @@ Route::prefix('super_admin')->middleware(['auth:sanctum', 'role:superadmin'])->g
     // Settings
     Route::get('/settings/system', [SuperAdminSettingsController::class, 'getSystem']);
     Route::put('/settings/system', [SuperAdminSettingsController::class, 'updateSystem']);
+    Route::post('/settings/system', [SuperAdminSettingsController::class, 'updateSystem']);
     Route::get('/settings/hotel/{hotelId}', [SuperAdminSettingsController::class, 'getHotel']);
     Route::put('/settings/hotel/{hotelId}', [SuperAdminSettingsController::class, 'updateHotel']);
 

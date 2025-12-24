@@ -15,18 +15,13 @@ class UpdateSystemSettingsRequest extends FormRequest
     {
         return [
             'systemName' => ['sometimes', 'string', 'max:255'],
-            'systemLogoUrl' => [
-                'nullable',
-                'string',
-                function ($attribute, $value, $fail) {
-                    if ($value && !filter_var($value, FILTER_VALIDATE_URL) && !str_starts_with($value, 'data:image/')) {
-                        $fail('The ' . $attribute . ' must be a valid URL or data URL.');
-                    }
-                },
-                'max:10000', // Allow larger size for data URLs
-            ],
-            'defaultCurrency' => ['sometimes', 'string', 'size:3'],
-            'defaultTimezone' => ['sometimes', 'string', 'timezone'],
+            'logo' => ['sometimes', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'], // 5MB max
+            // Removed systemLogoUrl - only file uploads allowed
+            // Currency and timezone are fixed to USD/UTC, no longer editable
+            // Payment options
+            'chapaEnabled' => ['sometimes', 'boolean'],
+            'stripeEnabled' => ['sometimes', 'boolean'],
+            'telebirrEnabled' => ['sometimes', 'boolean'],
         ];
     }
 }

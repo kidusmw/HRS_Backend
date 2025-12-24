@@ -59,8 +59,14 @@ class UserController extends Controller
             $query->where('active', filter_var($request->input('active'), FILTER_VALIDATE_BOOLEAN));
         }
 
-        $users = $query->paginate($request->integer('per_page', 15));
-
+        $perPage = $request->integer('per_page', 15);
+        // If per_page is 0 or a very large number, get all users (for frontend pagination)
+        if ($perPage === 0 || $perPage > 10000) {
+            $users = $query->get();
+            return UserResource::collection($users);
+        }
+        
+        $users = $query->paginate($perPage);
         return UserResource::collection($users);
     }
 
