@@ -30,17 +30,6 @@ class ChapaPaymentController extends Controller
      */
     public function initiate(Request $request, int $reservationId): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'reservation_id' => 'required|integer|exists:reservations,id',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
         $reservation = Reservation::with('room')->findOrFail($reservationId);
 
         $dto = new InitiateChapaPaymentRequestDto(

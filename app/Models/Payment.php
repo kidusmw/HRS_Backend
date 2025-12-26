@@ -14,6 +14,7 @@ class Payment extends Model
 
     protected $fillable = [
         'reservation_id',
+        'reservation_intent_id',
         'amount',
         'currency',
         'method',
@@ -40,6 +41,11 @@ class Payment extends Model
     public function reservation(): BelongsTo
     {
         return $this->belongsTo(Reservation::class);
+    }
+
+    public function reservationIntent(): BelongsTo
+    {
+        return $this->belongsTo(ReservationIntent::class);
     }
 
     /**

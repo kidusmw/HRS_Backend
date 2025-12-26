@@ -9,7 +9,6 @@ use App\Exceptions\Payments\ChapaRequestFailedException;
 use App\Exceptions\Payments\ChapaVerificationFailedException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Str;
 
 class ChapaClient
 {
@@ -35,11 +34,14 @@ class ChapaClient
     /**
      * Initiate a payment with Chapa
      *
+     * @param InitiateChapaPaymentRequestDto $dto Must include txRef (internal transaction reference)
      * @throws ChapaRequestFailedException
      */
     public function initiatePayment(InitiateChapaPaymentRequestDto $dto): InitiateChapaPaymentResponseDto
     {
-        $txRef = 'TXN-' . Str::random(16) . '-' . time();
+        if (empty($dto->txRef)) {
+            throw new ChapaRequestFailedException('Transaction reference (txRef) is required');
+        }
 
         $payload = [
             'amount' => $dto->amount,
@@ -47,7 +49,7 @@ class ChapaClient
             'email' => $dto->customerEmail,
             'first_name' => $dto->customerName,
             'phone_number' => $dto->customerPhone ?? '',
-            'tx_ref' => $txRef,
+            'tx_ref' => $dto->txRef,
             'callback_url' => $dto->callbackUrl,
             'return_url' => $dto->returnUrl,
         ];
@@ -75,7 +77,7 @@ class ChapaClient
 
             return new InitiateChapaPaymentResponseDto(
                 checkoutUrl: $checkoutUrl,
-                txRef: $txRef,
+                txRef: $dto->txRef,
                 status: $data['status'] ?? 'pending'
             );
         } catch (ChapaRequestFailedException $e) {

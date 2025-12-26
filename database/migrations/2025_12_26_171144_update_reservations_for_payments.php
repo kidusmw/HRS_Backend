@@ -16,8 +16,8 @@ return new class extends Migration
             $table->string('guest_email')->nullable();
             $table->string('guest_phone')->nullable();
             $table->decimal('total_amount', 10, 2)->default(0);
-            // Allowed: unpaid, partial, paid, overpaid
-            $table->string('payment_status')->default('unpaid');
+            // Allowed: pending, paid, failed, refunded
+            $table->string('payment_status')->default('pending');
         });
 
         // Drop legacy payment_method column (source of truth is payments.method)

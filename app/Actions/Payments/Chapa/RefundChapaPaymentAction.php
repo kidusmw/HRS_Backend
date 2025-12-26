@@ -33,7 +33,7 @@ class RefundChapaPaymentAction
             throw new PaymentRefundWindowExpiredException('Payment completion time is not recorded');
         }
 
-        $refundDeadline = $payment->paid_at->addHours(24);
+        $refundDeadline = $payment->paid_at->copy()->addHours(24);
         if (now()->isAfter($refundDeadline)) {
             throw new PaymentRefundWindowExpiredException();
         }

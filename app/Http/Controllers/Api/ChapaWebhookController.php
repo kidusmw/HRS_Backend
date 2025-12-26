@@ -15,12 +15,13 @@ class ChapaWebhookController extends Controller
     }
 
     /**
-     * Handle Chapa webhook
-     * Note: Add webhook signature verification based on Chapa documentation
+     * Handle Chapa webhook (authoritative path)
+     * Note: Webhook signature verification should be added per Chapa documentation
      */
     public function handle(Request $request): JsonResponse
     {
-        $this->handleWebhookAction->execute($request->all());
+        $signature = $request->header('X-Chapa-Signature'); // Adjust header name per Chapa docs
+        $this->handleWebhookAction->execute($request->all(), $signature);
 
         return response()->json([
             'message' => 'Webhook received',
