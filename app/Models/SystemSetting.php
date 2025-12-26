@@ -15,6 +15,7 @@ class SystemSetting extends Model
 
     /**
      * Get a setting value by key
+     * This method returns the value of the setting as a string.
      */
     public static function getValue(string $key, mixed $default = null): mixed
     {
