@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Enums\PaymentTransactionStatus;
 use Illuminate\Http\Request;
 use App\Models\Reservation;
 use App\Models\SystemSetting;
@@ -151,16 +152,17 @@ class PaymentController extends Controller
 
     /**
      * Transform a reservation to payment format
-     * This is a temporary solution until a Payment model is created.
+     * Note: Payments are now stored in the payments table, but the admin UI
+     * still expects a single "payment-like" row per reservation.
      * 
      * @param Reservation $reservation
      * @return array
      */
     private function transformReservationToPayment(Reservation $reservation): array
     {
-        // Calculate payment amount from room price and nights
+        // Calculate payment amount (prefer stored total_amount)
         $nights = max(1, $reservation->check_in->diffInDays($reservation->check_out));
-        $amount = (float) ($reservation->room->price * $nights);
+        $amount = (float) ($reservation->total_amount ?? ($reservation->room->price * $nights));
 
         // Map reservation status to payment status
         $paymentStatusMap = [
@@ -181,28 +183,31 @@ class PaymentController extends Controller
         $currency = SystemSetting::getValue('default_currency', 'USD');
 
         // Get payment method
-        // For walk-in bookings, use the payment_method from the reservation
-        // Otherwise, use the default from system settings
         $paymentMethod = $this->getDefaultPaymentMethod();
-        
-        if ($reservation->is_walk_in && $reservation->payment_method) {
-            // Map walk-in payment methods to PaymentMethod enum values
-            $paymentMethodMap = [
-                'cash' => 'cash',
-                'transfer' => 'bank_transfer',
-            ];
-            $paymentMethod = $paymentMethodMap[$reservation->payment_method] ?? $paymentMethod;
+
+        // Prefer real payment rows when available (latest completed, else latest)
+        $latestCompleted = $reservation->payments()
+            ->where('status', PaymentTransactionStatus::COMPLETED->value)
+            ->orderByDesc('id')
+            ->first();
+        $latestAny = $reservation->payments()->orderByDesc('id')->first();
+        $picked = $latestCompleted ?? $latestAny;
+        if ($picked) {
+            $paymentMethod = is_object($picked->method) ? $picked->method->value : (string) $picked->method;
+            $paymentStatus = is_object($picked->status) ? $picked->status->value : (string) $picked->status;
+            $currency = $picked->currency ?: $currency;
+            $amount = (float) $picked->amount;
         }
 
         return [
             'id' => $reservation->id, // Using reservation ID as payment ID
             'reservationId' => $reservation->id,
             'reservationNumber' => $reservationNumber,
-            'guestName' => $reservation->user?->name ?? 'Guest',
-            'guestEmail' => $reservation->user?->email,
+            'guestName' => $reservation->guest_name ?? $reservation->user?->name ?? 'Guest',
+            'guestEmail' => $reservation->guest_email ?? $reservation->user?->email,
             'amount' => $amount,
             'currency' => $currency, // From system settings (set by super admin)
-            'paymentMethod' => $paymentMethod, // From walk-in booking payment_method if available, otherwise from system settings
+            'paymentMethod' => $paymentMethod, // From payments table if available, otherwise from system settings
             'status' => $paymentStatus,
             'transactionId' => $transactionId,
             'paidAt' => $reservation->created_at->toIso8601String(),
