@@ -27,7 +27,7 @@ class ReservationIntentController extends Controller
         $validated = $request->validate([
             'hotel_id' => 'required|integer|exists:hotels,id',
             'room_type' => 'required|string',
-            'check_in' => 'required|date|after:today',
+            'check_in' => 'required|date|after_or_equal:today',
             'check_out' => 'required|date|after:check_in',
             'guests' => 'required|integer|min:1',
         ]);

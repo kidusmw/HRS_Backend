@@ -97,6 +97,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Customer Payments (authenticated)
     Route::prefix('customer')->group(function () {
         Route::post('/reservation-intents', [ReservationIntentController::class, 'store']);
+        Route::get('/payments/status', [CustomerChapaPaymentController::class, 'status']);
         Route::post('/payments/{paymentId}/refund', [CustomerChapaPaymentController::class, 'refund']);
     });
 

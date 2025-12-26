@@ -11,6 +11,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use App\Models\Payment;
 
 class ChapaPaymentController extends Controller
 {
@@ -43,6 +44,47 @@ class ChapaPaymentController extends Controller
             'data' => [
                 'tx_ref' => $response->txRef,
                 'status' => $response->chapaStatus,
+            ],
+        ]);
+    }
+
+    /**
+     * Get payment status by transaction reference (for polling)
+     */
+    public function status(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'tx_ref' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $txRef = $request->input('tx_ref');
+        $user = $request->user();
+
+        $payment = Payment::where('transaction_reference', $txRef)
+            ->whereHas('reservationIntent', function ($q) use ($user) {
+                $q->where('user_id', $user->id);
+            })
+            ->with(['reservationIntent', 'reservation'])
+            ->first();
+
+        if (!$payment) {
+            return response()->json([
+                'message' => 'Payment not found',
+            ], 404);
+        }
+
+        return response()->json([
+            'data' => [
+                'payment_status' => $payment->status->value,
+                'intent_status' => $payment->reservationIntent?->status ?? 'unknown',
+                'reservation_id' => $payment->reservation_id,
             ],
         ]);
     }

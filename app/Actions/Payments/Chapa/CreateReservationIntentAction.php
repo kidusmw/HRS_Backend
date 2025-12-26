@@ -20,11 +20,13 @@ class CreateReservationIntentAction
     public function execute(CreateReservationIntentDto $dto, int $userId): ReservationIntent
     {
         $hotel = Hotel::findOrFail($dto->hotelId);
-        $checkIn = Carbon::parse($dto->checkIn);
-        $checkOut = Carbon::parse($dto->checkOut);
+        // Normalize to day boundaries to avoid time-of-day and timezone edge cases
+        $checkIn = Carbon::parse($dto->checkIn)->startOfDay();
+        $checkOut = Carbon::parse($dto->checkOut)->startOfDay();
 
-        if ($checkIn->isPast() || $checkIn->isToday()) {
-            throw new \InvalidArgumentException('Check-in date must be in the future');
+        // Allow same-day check-in; prohibit dates before today (app/server timezone)
+        if ($checkIn->lt(Carbon::today())) {
+            throw new \InvalidArgumentException('Check-in date must be today or later');
         }
 
         if ($checkOut->lte($checkIn)) {
