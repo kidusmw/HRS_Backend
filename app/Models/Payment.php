@@ -20,6 +20,7 @@ class Payment extends Model
         'status',
         'transaction_reference',
         'collected_by',
+        'paid_at',
         'meta',
     ];
 
@@ -29,6 +30,7 @@ class Payment extends Model
             'amount' => 'decimal:2',
             'method' => PaymentMethod::class,
             'status' => PaymentTransactionStatus::class,
+            'paid_at' => 'datetime',
             'meta' => 'array',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',

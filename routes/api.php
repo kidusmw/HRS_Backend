@@ -44,6 +44,8 @@ use App\Http\Controllers\Api\Receptionist\ReportController as ReceptionistReport
 use App\Http\Controllers\Api\Customer\HotelController as CustomerHotelController;
 use App\Http\Controllers\Api\Customer\ReviewController as CustomerReviewController;
 use App\Http\Controllers\Api\Customer\AvailabilityController as CustomerAvailabilityController;
+use App\Http\Controllers\Api\Customer\Payments\ChapaPaymentController as CustomerChapaPaymentController;
+use App\Http\Controllers\Api\ChapaWebhookController;
 
 /**
  * Public Routes
@@ -77,6 +79,12 @@ Route::prefix('customer')->group(function () {
     Route::get('/hotels/{hotelId}/availability', [CustomerAvailabilityController::class, 'show']);
 });
 
+/**
+ * Chapa Webhook (Public - no auth, but should verify signature)
+ */
+Route::post('/webhooks/chapa', [ChapaWebhookController::class, 'handle'])->name('api.webhooks.chapa');
+Route::get('/payments/chapa/verify', [CustomerChapaPaymentController::class, 'verify'])->name('api.payments.chapa.callback');
+
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [LogoutController::class, 'logout']);
 
@@ -84,6 +92,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/profile', [ProfileController::class, 'show']);
     Route::put('/profile', [ProfileController::class, 'update']);
     Route::put('/profile/password', [ProfileController::class, 'updatePassword']);
+
+    // Customer Payments (authenticated)
+    Route::prefix('customer')->group(function () {
+        Route::post('/reservations/{reservationId}/payments/chapa/initiate', [CustomerChapaPaymentController::class, 'initiate']);
+        Route::post('/payments/{paymentId}/refund', [CustomerChapaPaymentController::class, 'refund']);
+    });
 
     // Protected routes for all authenticated users can be added here
 });
