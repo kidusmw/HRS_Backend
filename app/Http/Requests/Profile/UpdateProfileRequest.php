@@ -18,9 +18,16 @@ class UpdateProfileRequest extends FormRequest
         return [
             'name' => 'sometimes|string|max:255',
             'email' => 'sometimes|string|email|max:255|unique:users,email,' . $userId,
-            'phoneNumber' => 'nullable|string|max:20',
+            'phoneNumber' => 'nullable|string|regex:/^\+[1-9]\d{1,14}$/',
             'avatar' => 'nullable|image|max:5120', // 5MB
             'removeAvatar' => 'sometimes|boolean',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'phoneNumber.regex' => 'Phone number must be in E.164 format (e.g., +251912345678)',
         ];
     }
 }
