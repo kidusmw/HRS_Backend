@@ -79,5 +79,13 @@ class Hotel extends Model
     {
         return $this->belongsTo(User::class, 'primary_admin_id');
     }
+
+    /**
+     * Get reviews for this hotel
+     */
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(Review::class);
+    }
 }
 

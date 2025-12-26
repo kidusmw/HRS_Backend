@@ -576,7 +576,7 @@ class ReservationController extends Controller
         $reservation->status = 'checked_out';
         $reservation->save();
 
-        // Update room status back to available (if no other active reservations)
+        // Update room status to maintenance (for cleaning)
         $room = $reservation->room;
         if ($room) {
             $oldRoomStatus = $room->status?->value ?? 'available';
@@ -588,10 +588,11 @@ class ReservationController extends Controller
                 ->where('check_out', '>=', now())
                 ->exists();
 
-            // Set room status based on whether there are other active reservations
+            // If there are other active reservations, keep room as occupied
+            // Otherwise, set to maintenance (staff will mark it available after cleaning)
             $room->status = $hasOtherActiveReservations 
                 ? \App\Enums\RoomStatus::OCCUPIED 
-                : \App\Enums\RoomStatus::AVAILABLE;
+                : \App\Enums\RoomStatus::MAINTENANCE;
             $room->save();
 
             Log::info('Room status updated during check-out', [

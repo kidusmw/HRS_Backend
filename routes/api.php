@@ -41,6 +41,9 @@ use App\Http\Controllers\Api\Receptionist\DashboardController as ReceptionistDas
 use App\Http\Controllers\Api\Receptionist\RoomController as ReceptionistRoomController;
 use App\Http\Controllers\Api\Receptionist\ReservationController as ReceptionistReservationController;
 use App\Http\Controllers\Api\Receptionist\ReportController as ReceptionistReportController;
+use App\Http\Controllers\Api\Customer\HotelController as CustomerHotelController;
+use App\Http\Controllers\Api\Customer\ReviewController as CustomerReviewController;
+use App\Http\Controllers\Api\Customer\AvailabilityController as CustomerAvailabilityController;
 
 /**
  * Public Routes
@@ -57,6 +60,22 @@ Route::get('/email/verify/{id}/{hash}', VerifyEmailController::class)
 // Password reset (API-only)
 Route::post('/password/forgot', [PasswordResetController::class, 'sendResetLinkEmail']);
 Route::post('/password/reset', [PasswordResetController::class, 'reset']);
+
+/**
+ * Customer API (Public - no auth required)
+ * Base: /api/customer/*
+ */
+Route::prefix('customer')->group(function () {
+    // Hotels
+    Route::get('/hotels', [CustomerHotelController::class, 'index']);
+    Route::get('/hotels/{id}', [CustomerHotelController::class, 'show']);
+    
+    // Reviews
+    Route::get('/hotels/{hotelId}/reviews', [CustomerReviewController::class, 'index']);
+    
+    // Availability
+    Route::get('/hotels/{hotelId}/availability', [CustomerAvailabilityController::class, 'show']);
+});
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [LogoutController::class, 'logout']);

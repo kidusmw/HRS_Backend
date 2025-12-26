@@ -93,6 +93,10 @@ class User extends Authenticatable
         return $this->hasMany(Backup::class, 'created_by');
     }
 
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(Review::class);
+    }
 
     /**
      * Role Check Helper methods
