@@ -7,8 +7,8 @@ use App\Actions\Payments\Chapa\InitiatePaymentForIntentAction;
 use App\DTO\Payments\Chapa\CreatePaymentForIntentDto;
 use App\DTO\Payments\Chapa\CreateReservationIntentDto;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Customer\StoreReservationIntentRequest;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 class ReservationIntentController extends Controller
@@ -22,16 +22,9 @@ class ReservationIntentController extends Controller
     /**
      * Create reservation intent and initiate payment
      */
-    public function store(Request $request): JsonResponse
+    public function store(StoreReservationIntentRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'hotel_id' => 'required|integer|exists:hotels,id',
-            'room_type' => 'required|string',
-            'check_in' => 'required|date|after_or_equal:today',
-            'check_out' => 'required|date|after:check_in',
-            'guests' => 'required|integer|min:1',
-        ]);
-
+        $validated = $request->validated();
         $user = $request->user();
 
         $intentDto = new CreateReservationIntentDto(
