@@ -11,6 +11,7 @@ use App\Models\Reservation;
 use App\Models\ReservationIntent;
 use App\Models\Room;
 use App\Services\Chapa\ChapaClient;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -24,12 +25,19 @@ class HandleChapaWebhookAction
     /**
      * Authoritative webhook handler: verify signature, verify via Chapa, confirm atomically
      */
-    public function execute(array $webhookData, ?string $signature = null): void
+    public function execute(array $webhookData, array $signatures = [], ?string $rawBody = null): void
     {
-        // TODO: Verify webhook signature per Chapa documentation
-        // if (!$this->verifySignature($webhookData, $signature)) {
-        //     throw new \Exception('Invalid webhook signature');
-        // }
+        if (!$this->verifySignature($signatures, $rawBody)) {
+            Log::warning('Chapa webhook: invalid signature', [
+                'has_signatures' => !empty($signatures),
+            ]);
+
+            throw new HttpResponseException(
+                response()->json([
+                    'message' => 'Invalid webhook signature',
+                ], 401)
+            );
+        }
 
         $txRef = $webhookData['tx_ref'] ?? null;
         if (!$txRef) {
@@ -205,5 +213,36 @@ class HandleChapaWebhookAction
 
             return $room;
         });
+    }
+
+    private function verifySignature(array $signatures, ?string $rawBody): bool
+    {
+        $secret = config('services.chapa.webhook_secret');
+        if (empty($secret)) {
+            Log::error('Chapa webhook secret is not configured (CHAPA_WEBHOOK_SECRET)');
+            return false;
+        }
+
+        if (empty($signatures) || $rawBody === null) {
+            return false;
+        }
+
+        $expectedRaw = hash_hmac('sha256', $rawBody, $secret);
+        $expectedTrimmed = hash_hmac('sha256', trim($rawBody), $secret);
+
+        foreach ($signatures as $sig) {
+            $sig = trim((string) $sig);
+
+            // Handle possible prefix format: sha256=<hex>
+            if (str_starts_with($sig, 'sha256=')) {
+                $sig = substr($sig, 7);
+            }
+
+            if (hash_equals($expectedRaw, $sig) || hash_equals($expectedTrimmed, $sig)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

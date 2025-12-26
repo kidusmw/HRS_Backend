@@ -10,6 +10,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Customer\StoreReservationIntentRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Str;
+use Illuminate\Support\Arr;
 
 class ReservationIntentController extends Controller
 {
@@ -40,13 +41,17 @@ class ReservationIntentController extends Controller
         // Generate unique transaction reference
         $txRef = 'TXN-' . Str::random(16) . '-' . time();
 
+        // Ensure the return URL always includes tx_ref so frontend can identify the payment on callback
+        $baseReturnUrl = $request->input('return_url', config('app.frontend_url') . '/payment/return');
+        $returnUrl = $this->appendQueryParam($baseReturnUrl, 'tx_ref', $txRef);
+
         $paymentDto = new CreatePaymentForIntentDto(
             reservationIntentId: $intent->id,
             txRef: $txRef,
             amount: (float) $intent->total_amount,
             currency: $intent->currency,
             callbackUrl: route('api.webhooks.chapa'),
-            returnUrl: $request->input('return_url', config('app.frontend_url') . '/reservations/payment/return'),
+            returnUrl: $returnUrl,
         );
 
         $chapaResponse = $this->initiatePaymentAction->execute($paymentDto);
@@ -59,5 +64,36 @@ class ReservationIntentController extends Controller
                 'tx_ref' => $chapaResponse->txRef,
             ],
         ], 201);
+    }
+
+    private function appendQueryParam(string $url, string $key, string $value): string
+    {
+        $parts = parse_url($url);
+        $query = [];
+
+        if (!empty($parts['query'])) {
+            parse_str($parts['query'], $query);
+        }
+
+        $query[$key] = $value;
+        $parts['query'] = http_build_query($query);
+
+        $scheme = $parts['scheme'] ?? null;
+        $host = $parts['host'] ?? null;
+        $port = isset($parts['port']) ? ':' . $parts['port'] : '';
+        $user = $parts['user'] ?? null;
+        $pass = isset($parts['pass']) ? ':' . $parts['pass'] : '';
+        $pass = ($user || $pass) ? "$pass@" : '';
+        $path = $parts['path'] ?? '';
+        $queryString = $parts['query'] ? '?' . $parts['query'] : '';
+        $fragment = isset($parts['fragment']) ? '#' . $parts['fragment'] : '';
+
+        // Absolute URL
+        if ($scheme && $host) {
+            return "{$scheme}://{$user}{$pass}{$host}{$port}{$path}{$queryString}{$fragment}";
+        }
+
+        // Relative URL
+        return "{$path}{$queryString}{$fragment}";
     }
 }

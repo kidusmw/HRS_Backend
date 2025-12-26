@@ -20,8 +20,17 @@ class ChapaWebhookController extends Controller
      */
     public function handle(Request $request): JsonResponse
     {
-        $signature = $request->header('X-Chapa-Signature'); // Adjust header name per Chapa docs
-        $this->handleWebhookAction->execute($request->all(), $signature);
+        // Chapa may send one or more signature headers; accept any valid signature.
+        $signatures = array_values(array_filter([
+            $request->header('Chapa-Signature'),
+            $request->header('x-chapa-signature'),
+            $request->header('X-Chapa-Signature'),
+        ]));
+
+        // Verify signature against the RAW body (do not re-encode JSON)
+        $rawBody = $request->getContent();
+
+        $this->handleWebhookAction->execute($request->all(), $signatures, $rawBody);
 
         return response()->json([
             'message' => 'Webhook received',

@@ -44,14 +44,24 @@ class InitiatePaymentForIntentAction
                 ],
             ]);
 
+            $fullName = trim((string) ($intent->user->name ?? ''));
+            if ($fullName === '') {
+                $fullName = 'Customer';
+            }
+
+            $parts = preg_split('/\s+/', $fullName, 2);
+            $firstName = $parts[0] ?? 'Customer';
+            $lastName = $parts[1] ?? 'Customer';
+
             // Now call Chapa
             $chapaDto = new InitiateChapaPaymentRequestDto(
                 txRef: $dto->txRef,
                 amount: $dto->amount,
                 currency: $dto->currency,
-                customerName: $intent->user->name,
-                customerEmail: $intent->user->email,
                 customerPhone: $intent->user->phone_number,
+                customerEmail: $intent->user->email,
+                customerFirstName: $firstName,
+                customerLastName: $lastName,
                 callbackUrl: $dto->callbackUrl,
                 returnUrl: $dto->returnUrl,
             );

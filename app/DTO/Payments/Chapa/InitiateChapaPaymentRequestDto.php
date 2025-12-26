@@ -8,9 +8,10 @@ readonly class InitiateChapaPaymentRequestDto
         public string $txRef,
         public float $amount,
         public string $currency,
-        public string $customerName,
-        public string $customerEmail,
         public ?string $customerPhone,
+        public string $customerEmail,
+        public string $customerFirstName,
+        public string $customerLastName,
         public string $callbackUrl,
         public string $returnUrl,
     ) {
