@@ -4,9 +4,13 @@ namespace App\Http\Controllers\Api\Receptionist;
 
 use App\Http\Controllers\Controller;
 use App\Models\Reservation;
+use App\Models\Payment;
 use App\Models\Room;
 use App\Models\User;
 use App\Enums\UserRole;
+use App\Enums\PaymentMethod;
+use App\Enums\PaymentTransactionStatus;
+use App\Enums\PaymentStatus;
 use App\Services\AuditLogger;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -247,25 +251,57 @@ class ReservationController extends Controller
             ], 422);
         }
 
+        // Compute total amount (room price × nights, min 1)
+        $nights = max(1, $checkIn->diffInDays($checkOut));
+        $totalAmount = (float) $room->price * $nights;
+
         // Create reservation (walk-in booking)
         $reservation = Reservation::create([
             'room_id' => $room->id,
             'user_id' => $guestUser->id,
+            'guest_name' => $request->input('guestName'),
+            'guest_email' => $guestEmail,
+            'guest_phone' => $request->input('guestPhone'),
             'check_in' => $checkIn,
             'check_out' => $checkOut,
             'status' => 'confirmed', // Walk-ins are automatically confirmed
             'is_walk_in' => true, // Mark as walk-in booking
-            'payment_method' => $paymentMethod, // cash or transfer
+            'total_amount' => $totalAmount,
+            'payment_status' => PaymentStatus::UNPAID->value,
             'guests' => 1, // Default, can be updated if needed
             'special_requests' => $request->input('specialRequests'),
         ]);
 
-        Log::info('Receptionist walk-in reservation created with payment method', [
+        // Create payment record for walk-in booking (collected/verified by receptionist)
+        $methodEnum = match ($paymentMethod) {
+            'cash' => PaymentMethod::CASH,
+            'transfer' => PaymentMethod::BANK_TRANSFER,
+            default => PaymentMethod::CASH,
+        };
+
+        $payment = Payment::create([
+            'reservation_id' => $reservation->id,
+            'amount' => $totalAmount,
+            'currency' => 'ETB',
+            'method' => $methodEnum->value,
+            'status' => PaymentTransactionStatus::COMPLETED->value,
+            'collected_by' => $receptionist->id,
+            'meta' => [
+                'walk_in' => true,
+                'nights' => $nights,
+            ],
+        ]);
+
+        // Update reservation payment_status based on completed payments
+        $reservation->calculatePaymentStatus();
+
+        Log::info('Receptionist walk-in payment created', [
             'receptionist_id' => $receptionist->id,
             'hotel_id' => $hotelId,
             'reservation_id' => $reservation->id,
-            'payment_method' => $reservation->payment_method,
-            'payment_method_from_db' => $reservation->fresh()->payment_method,
+            'payment_id' => $payment->id,
+            'method' => $payment->method?->value ?? (string) $payment->method,
+            'amount' => (float) $payment->amount,
         ]);
 
         Log::info('Receptionist walk-in reservation created successfully', [
@@ -286,6 +322,8 @@ class ReservationController extends Controller
             'check_in' => $checkIn->toDateString(),
             'check_out' => $checkOut->toDateString(),
             'payment_method' => $paymentMethod,
+            'payment_id' => $payment->id,
+            'total_amount' => $totalAmount,
             'is_walk_in' => true,
         ]);
 

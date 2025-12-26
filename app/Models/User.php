@@ -98,6 +98,11 @@ class User extends Authenticatable
         return $this->hasMany(Review::class);
     }
 
+    public function collectedPayments(): HasMany
+    {
+        return $this->hasMany(Payment::class, 'collected_by');
+    }
+
     /**
      * Role Check Helper methods
      */
