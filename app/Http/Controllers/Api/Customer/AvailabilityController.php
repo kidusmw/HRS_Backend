@@ -44,14 +44,13 @@ class AvailabilityController extends Controller
             ], 400);
         }
 
-        // Get all available rooms for this hotel, grouped by type
+        // Get all rooms for this hotel, grouped by type
+        // We'll filter by availability status when counting
         $rooms = Room::where('hotel_id', $hotelId)
-            ->where('status', RoomStatus::AVAILABLE)
             ->get()
             ->groupBy('type');
 
         // Get all reservations that might overlap with the date range
-        // We need to check a bit wider range to catch reservations that start before or end after
         $reservations = Reservation::whereHas('room', function ($q) use ($hotelId) {
             $q->where('hotel_id', $hotelId);
         })
@@ -75,60 +74,49 @@ class AvailabilityController extends Controller
         ->get()
         ->groupBy('room_id');
 
-        // Generate all days in the range
-        $days = [];
-        $current = $start->copy();
-        while ($current->lte($end)) {
-            $days[] = $current->toDateString();
-            $current->addDay();
-        }
-
-        // Build availability by room type
+        // Build availability by room type for the entire date range
         $availabilityByType = [];
 
         foreach ($rooms as $type => $typeRooms) {
-            $typeDays = [];
+            $availableCount = 0;
+            $minPrice = null;
 
-            foreach ($days as $day) {
-                $dayCarbon = Carbon::parse($day);
-                $availableCount = 0;
-                $minPrice = null;
+            foreach ($typeRooms as $room) {
+                // Only consider rooms that are available (not in maintenance, unavailable, or occupied)
+                if ($room->status !== RoomStatus::AVAILABLE) {
+                    continue;
+                }
 
-                foreach ($typeRooms as $room) {
-                    // Check if this room is blocked on this day
-                    $isBlocked = false;
-                    
-                    if (isset($reservations[$room->id])) {
-                        foreach ($reservations[$room->id] as $reservation) {
-                            // Inclusive overlap: check_in <= day <= check_out
-                            $checkIn = Carbon::parse($reservation->check_in);
-                            $checkOut = Carbon::parse($reservation->check_out);
-                            
-                            if ($dayCarbon->gte($checkIn) && $dayCarbon->lte($checkOut)) {
-                                $isBlocked = true;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (!$isBlocked) {
-                        $availableCount++;
-                        if ($minPrice === null || $room->price < $minPrice) {
-                            $minPrice = (float) $room->price;
+                // Check if this room is blocked for the entire date range
+                $isBlocked = false;
+                
+                if (isset($reservations[$room->id])) {
+                    foreach ($reservations[$room->id] as $reservation) {
+                        $checkIn = Carbon::parse($reservation->check_in);
+                        $checkOut = Carbon::parse($reservation->check_out);
+                        
+                        // Check if reservation overlaps with the date range (inclusive)
+                        // A room is blocked if any day in the range overlaps with the reservation
+                        if (!($checkOut->lt($start) || $checkIn->gt($end))) {
+                            $isBlocked = true;
+                            break;
                         }
                     }
                 }
 
-                $typeDays[] = [
-                    'date' => $day,
-                    'roomsAvailable' => $availableCount,
-                    'price' => $minPrice ?? 0,
-                ];
+                if (!$isBlocked) {
+                    $availableCount++;
+                    if ($minPrice === null || $room->price < $minPrice) {
+                        $minPrice = (float) $room->price;
+                    }
+                }
             }
 
             $availabilityByType[] = [
                 'type' => $type,
-                'days' => $typeDays,
+                'totalRooms' => $typeRooms->count(),
+                'availableRooms' => $availableCount,
+                'priceFrom' => $availableCount > 0 ? $minPrice : null,
             ];
         }
 
