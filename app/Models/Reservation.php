@@ -90,19 +90,22 @@ class Reservation extends Model
     }
 
     /**
-     * Sums completed payments and updates payment_status based on total_amount.
+     * Sums paid/completed payments and updates payment_status based on total_amount.
      *
-     * unpaid:    paid <= 0
-     * partial:   0 < paid < total
-     * paid:      paid == total
-     * overpaid:  paid > total
+     * pending:   paid <= 0
+     * paid:      paid >= total
+     * failed:    payment failed (set explicitly)
+     * refunded: payment refunded (set explicitly)
      */
     public function calculatePaymentStatus(bool $persist = true): PaymentStatus
     {
         $total = (float) ($this->total_amount ?? 0);
 
         $paid = (float) $this->payments()
-            ->where('status', PaymentTransactionStatus::COMPLETED->value)
+            ->whereIn('status', [
+                PaymentTransactionStatus::PAID->value,
+                PaymentTransactionStatus::COMPLETED->value,
+            ])
             ->sum('amount');
 
         // Compare in cents to avoid floating point edge cases
@@ -110,13 +113,12 @@ class Reservation extends Model
         $paidCents = (int) round($paid * 100);
 
         if ($paidCents <= 0) {
-            $status = PaymentStatus::UNPAID;
-        } elseif ($paidCents < $totalCents) {
-            $status = PaymentStatus::PARTIAL;
-        } elseif ($paidCents === $totalCents) {
+            $status = PaymentStatus::PENDING;
+        } elseif ($paidCents >= $totalCents) {
             $status = PaymentStatus::PAID;
         } else {
-            $status = PaymentStatus::OVERPAID;
+            // Partial payment - still pending
+            $status = PaymentStatus::PENDING;
         }
 
         if ($persist) {
