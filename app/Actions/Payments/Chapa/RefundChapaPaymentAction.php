@@ -23,9 +23,13 @@ class RefundChapaPaymentAction
      */
     public function execute(RefundChapaPaymentRequestDto $dto): void
     {
-        $payment = Payment::findOrFail($dto->paymentId);
+        $payment = Payment::with(['reservation', 'reservationIntent'])->findOrFail($dto->paymentId);
 
-        if ($payment->status !== PaymentTransactionStatus::COMPLETED) {
+        // Check if payment is paid (either PAID or COMPLETED)
+        if (!in_array($payment->status, [
+            PaymentTransactionStatus::PAID,
+            PaymentTransactionStatus::COMPLETED,
+        ])) {
             throw new PaymentNotCompletedException();
         }
 
@@ -48,7 +52,17 @@ class RefundChapaPaymentAction
             ]);
             $payment->save();
 
-            $payment->reservation->calculatePaymentStatus();
+            // Update reservation payment status if exists
+            if ($payment->reservation) {
+                $payment->reservation->payment_status = \App\Enums\PaymentStatus::REFUNDED;
+                $payment->reservation->save();
+            }
+
+            // Update intent status if exists
+            if ($payment->reservationIntent) {
+                $payment->reservationIntent->status = 'failed';
+                $payment->reservationIntent->save();
+            }
         });
     }
 }

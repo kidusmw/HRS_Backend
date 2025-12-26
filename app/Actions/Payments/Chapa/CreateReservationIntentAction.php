@@ -39,26 +39,27 @@ class CreateReservationIntentAction
             ->where('status', RoomStatus::AVAILABLE)
             ->get();
 
-        // Check for overlapping reservations
-        $blockedRoomIds = Reservation::whereHas('room', function ($q) use ($dto) {
-            $q->where('hotel_id', $dto->hotelId)
-                ->where('type', $dto->roomType);
-        })
-        ->whereIn('status', ['pending', 'confirmed', 'checked_in'])
-        ->where(function ($q) use ($checkIn, $checkOut) {
-            $q->where(function ($sub) use ($checkIn, $checkOut) {
-                $sub->whereBetween('check_in', [$checkIn->toDateString(), $checkOut->toDateString()]);
+        // Check for overlapping reservations (rooms of the same type in the same hotel)
+        $roomsOfType = Room::where('hotel_id', $dto->hotelId)
+            ->where('type', $dto->roomType)
+            ->pluck('id');
+
+        $blockedRoomIds = Reservation::whereIn('room_id', $roomsOfType)
+            ->whereIn('status', ['pending', 'confirmed', 'checked_in'])
+            ->where(function ($q) use ($checkIn, $checkOut) {
+                $q->where(function ($sub) use ($checkIn, $checkOut) {
+                    $sub->whereBetween('check_in', [$checkIn->toDateString(), $checkOut->toDateString()]);
+                })
+                ->orWhere(function ($sub) use ($checkIn, $checkOut) {
+                    $sub->whereBetween('check_out', [$checkIn->toDateString(), $checkOut->toDateString()]);
+                })
+                ->orWhere(function ($sub) use ($checkIn, $checkOut) {
+                    $sub->where('check_in', '<=', $checkIn->toDateString())
+                        ->where('check_out', '>=', $checkOut->toDateString());
+                });
             })
-            ->orWhere(function ($sub) use ($checkIn, $checkOut) {
-                $sub->whereBetween('check_out', [$checkIn->toDateString(), $checkOut->toDateString()]);
-            })
-            ->orWhere(function ($sub) use ($checkIn, $checkOut) {
-                $sub->where('check_in', '<=', $checkIn->toDateString())
-                    ->where('check_out', '>=', $checkOut->toDateString());
-            });
-        })
-        ->pluck('room_id')
-        ->unique();
+            ->pluck('room_id')
+            ->unique();
 
         $trulyAvailable = $availableRooms->reject(fn ($room) => $blockedRoomIds->contains($room->id));
 

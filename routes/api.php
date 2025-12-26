@@ -46,6 +46,7 @@ use App\Http\Controllers\Api\Customer\ReviewController as CustomerReviewControll
 use App\Http\Controllers\Api\Customer\AvailabilityController as CustomerAvailabilityController;
 use App\Http\Controllers\Api\Customer\Payments\ChapaPaymentController as CustomerChapaPaymentController;
 use App\Http\Controllers\Api\ChapaWebhookController;
+use App\Http\Controllers\Api\Customer\ReservationIntentController;  
 
 /**
  * Public Routes
@@ -95,7 +96,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Customer Payments (authenticated)
     Route::prefix('customer')->group(function () {
-        Route::post('/reservations/{reservationId}/payments/chapa/initiate', [CustomerChapaPaymentController::class, 'initiate']);
+        Route::post('/reservation-intents', [ReservationIntentController::class, 'store']);
         Route::post('/payments/{paymentId}/refund', [CustomerChapaPaymentController::class, 'refund']);
     });
 
