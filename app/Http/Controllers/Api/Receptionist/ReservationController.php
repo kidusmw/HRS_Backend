@@ -51,7 +51,7 @@ class ReservationController extends Controller
         $search = $request->input('search');
 
         $query = Reservation::query()
-            ->with(['room', 'user'])
+            ->with(['room', 'user', 'payments'])
             ->whereHas('room', function ($q) use ($hotelId) {
                 $q->where('hotel_id', $hotelId);
             });
@@ -80,6 +80,26 @@ class ReservationController extends Controller
         }
 
         $reservations = $query->orderByDesc('created_at')->paginate($perPage);
+
+        // Add amount_paid and currency to each reservation
+        $reservations->getCollection()->transform(function ($reservation) {
+            // Calculate amount paid from completed/paid payments
+            $amountPaid = (float) $reservation->payments
+                ->whereIn('status', [
+                    PaymentTransactionStatus::PAID,
+                    PaymentTransactionStatus::COMPLETED,
+                ])
+                ->sum('amount');
+
+            // Get currency from first payment, default to ETB
+            $currency = $reservation->payments->first()?->currency ?? 'ETB';
+
+            // Add computed fields to the reservation
+            $reservation->amount_paid = $amountPaid;
+            $reservation->currency = $currency;
+
+            return $reservation;
+        });
 
         return response()->json($reservations);
     }

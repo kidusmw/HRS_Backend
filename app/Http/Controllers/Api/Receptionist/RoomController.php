@@ -4,7 +4,10 @@ namespace App\Http\Controllers\Api\Receptionist;
 
 use App\Http\Controllers\Controller;
 use App\Models\Room;
+use App\Models\Reservation;
+use App\Enums\RoomStatus;
 use App\Services\AuditLogger;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -191,6 +194,117 @@ class RoomController extends Controller
         return response()->json([
             'message' => 'Room status updated successfully',
             'data' => $this->transformRoom($room->fresh())
+        ]);
+    }
+
+    /**
+     * Get available rooms for a date range
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function available(Request $request)
+    {
+        $user = auth()->user();
+        $hotelId = $user->hotel_id;
+
+        Log::info('Receptionist available rooms list accessed', [
+            'receptionist_id' => $user->id,
+            'hotel_id' => $hotelId,
+        ]);
+
+        if (!$hotelId) {
+            return response()->json([
+                'message' => 'User is not associated with a hotel'
+            ], 400);
+        }
+
+        $checkIn = $request->input('check_in');
+        $checkOut = $request->input('check_out');
+        $roomType = $request->input('room_type');
+
+        if (!$checkIn || !$checkOut) {
+            return response()->json([
+                'message' => 'check_in and check_out parameters are required (YYYY-MM-DD format)'
+            ], 400);
+        }
+
+        try {
+            $start = Carbon::parse($checkIn);
+            $end = Carbon::parse($checkOut);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Invalid date format. Use YYYY-MM-DD'
+            ], 400);
+        }
+
+        if ($start->gt($end)) {
+            return response()->json([
+                'message' => 'Check-in date must be before or equal to check-out date'
+            ], 400);
+        }
+
+        // Get all rooms for this hotel with status = available
+        $query = Room::where('hotel_id', $hotelId)
+            ->where('status', RoomStatus::AVAILABLE);
+
+        // Filter by room type if provided
+        if ($roomType) {
+            $query->where('type', $roomType);
+        }
+
+        $rooms = $query->get();
+
+        // Get all reservations that might overlap with the date range
+        $reservations = Reservation::whereHas('room', function ($q) use ($hotelId) {
+            $q->where('hotel_id', $hotelId);
+        })
+        ->whereIn('status', ['pending', 'confirmed', 'checked_in'])
+        ->where(function ($q) use ($start, $end) {
+            // Reservations that overlap with the date range (inclusive overlap)
+            $q->where(function ($sub) use ($start, $end) {
+                // Reservation starts within range
+                $sub->whereBetween('check_in', [$start->toDateString(), $end->toDateString()]);
+            })
+            ->orWhere(function ($sub) use ($start, $end) {
+                // Reservation ends within range
+                $sub->whereBetween('check_out', [$start->toDateString(), $end->toDateString()]);
+            })
+            ->orWhere(function ($sub) use ($start, $end) {
+                // Reservation completely contains the range
+                $sub->where('check_in', '<=', $start->toDateString())
+                    ->where('check_out', '>=', $end->toDateString());
+            });
+        })
+        ->get()
+        ->groupBy('room_id');
+
+        // Filter out rooms that are blocked by reservations
+        $availableRooms = $rooms->filter(function ($room) use ($reservations, $start, $end) {
+            if (!isset($reservations[$room->id])) {
+                return true; // No reservations for this room
+            }
+
+            // Check if any reservation overlaps with the date range
+            foreach ($reservations[$room->id] as $reservation) {
+                $resCheckIn = Carbon::parse($reservation->check_in);
+                $resCheckOut = Carbon::parse($reservation->check_out);
+                
+                // Check if reservation overlaps (inclusive)
+                if (!($resCheckOut->lt($start) || $resCheckIn->gt($end))) {
+                    return false; // Room is blocked
+                }
+            }
+
+            return true; // Room is available
+        });
+
+        // Transform to frontend format
+        $transformedRooms = $availableRooms->map(function ($room) {
+            return $this->transformRoom($room);
+        })->values();
+
+        return response()->json([
+            'data' => $transformedRooms,
         ]);
     }
 

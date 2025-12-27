@@ -32,7 +32,7 @@ class SettingsController extends Controller
         $settings = [
             'systemName' => SystemSetting::getValue('system_name', config('app.name')),
             'systemLogoUrl' => $resolvedLogoUrl,
-            'defaultCurrency' => 'USD', // Always USD
+            'defaultCurrency' => 'ETB', // Always ETB
             'defaultTimezone' => 'UTC', // Always UTC
             // Payment options
             'chapaEnabled' => (bool) SystemSetting::getValue('chapa_enabled', false),
@@ -56,7 +56,7 @@ class SettingsController extends Controller
         $oldSettings = [
             'systemName' => SystemSetting::getValue('system_name', config('app.name')),
             'systemLogoUrl' => $oldLogoUrl,
-            'defaultCurrency' => 'USD',
+            'defaultCurrency' => 'ETB',
             'defaultTimezone' => 'UTC',
             'chapaEnabled' => (bool) SystemSetting::getValue('chapa_enabled', false),
             'stripeEnabled' => (bool) SystemSetting::getValue('stripe_enabled', false),

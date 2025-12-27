@@ -223,6 +223,7 @@ Route::prefix('receptionist')->middleware(['auth:sanctum', 'role:receptionist'])
 
     // Rooms (hotel-scoped, view-only with status update)
     Route::get('/rooms', [ReceptionistRoomController::class, 'index']);
+    Route::get('/rooms/available', [ReceptionistRoomController::class, 'available']);
     Route::patch('/rooms/{id}/status', [ReceptionistRoomController::class, 'updateStatus']);
 
     // Reservations (hotel-scoped)
