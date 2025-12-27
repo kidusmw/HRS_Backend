@@ -4,7 +4,10 @@ namespace App\Http\Controllers\Api\Receptionist;
 
 use App\Http\Controllers\Controller;
 use App\Models\Room;
+use App\Models\Reservation;
+use App\Enums\RoomStatus;
 use App\Services\AuditLogger;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -191,6 +194,82 @@ class RoomController extends Controller
         return response()->json([
             'message' => 'Room status updated successfully',
             'data' => $this->transformRoom($room->fresh())
+        ]);
+    }
+
+    /**
+     * Get available rooms for a date range
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function available(Request $request)
+    {
+        $user = auth()->user();
+        $hotelId = $user->hotel_id;
+
+        Log::info('Receptionist available rooms list accessed', [
+            'receptionist_id' => $user->id,
+            'hotel_id' => $hotelId,
+        ]);
+
+        if (!$hotelId) {
+            return response()->json([
+                'message' => 'User is not associated with a hotel'
+            ], 400);
+        }
+
+        $checkIn = $request->input('check_in');
+        $checkOut = $request->input('check_out');
+        $roomType = $request->input('room_type');
+
+        if (!$checkIn || !$checkOut) {
+            return response()->json([
+                'message' => 'check_in and check_out parameters are required (YYYY-MM-DD format)'
+            ], 400);
+        }
+
+        try {
+            $start = Carbon::parse($checkIn);
+            $end = Carbon::parse($checkOut);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Invalid date format. Use YYYY-MM-DD'
+            ], 400);
+        }
+
+        if ($start->gt($end)) {
+            return response()->json([
+                'message' => 'Check-in date must be before or equal to check-out date'
+            ], 400);
+        }
+
+        // Inclusive overlap rule:
+        // A reservation overlaps the requested range if:
+        //   existing.check_in <= requested.check_out AND existing.check_out >= requested.check_in
+        //
+        // Since reservations are stored as DATE, we compare date strings for consistency.
+        $startDate = $start->toDateString();
+        $endDate = $end->toDateString();
+
+        // Get rooms for this hotel with status = available, excluding any room with an overlapping active reservation.
+        $query = Room::where('hotel_id', $hotelId)
+            ->where('status', RoomStatus::AVAILABLE)
+            ->when($roomType, fn ($q) => $q->where('type', $roomType))
+            ->whereDoesntHave('reservations', function ($q) use ($startDate, $endDate) {
+                $q->whereIn('status', ['pending', 'confirmed', 'checked_in'])
+                    ->whereDate('check_in', '<=', $endDate)
+                    ->whereDate('check_out', '>=', $startDate);
+            });
+
+        $rooms = $query->get();
+
+        // Transform to frontend format
+        $transformedRooms = $rooms->map(function ($room) {
+            return $this->transformRoom($room);
+        })->values();
+
+        return response()->json([
+            'data' => $transformedRooms,
         ]);
     }
 

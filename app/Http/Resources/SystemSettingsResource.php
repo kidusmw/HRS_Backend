@@ -15,10 +15,11 @@ class SystemSettingsResource extends JsonResource
         return [
             'systemName' => $this->resource['systemName'] ?? config('app.name'),
             'systemLogoUrl' => $this->resource['systemLogoUrl'] ?? null,
-            'defaultCurrency' => 'USD', // Always USD
+            'defaultCurrency' => 'ETB', // Always ETB
             'defaultTimezone' => 'UTC', // Always UTC
             // Payment options
-            'chapaEnabled' => $this->resource['chapaEnabled'] ?? false,
+            // Chapa is always enabled for customers (no toggle)
+            'chapaEnabled' => true,
             'stripeEnabled' => $this->resource['stripeEnabled'] ?? false,
             'telebirrEnabled' => $this->resource['telebirrEnabled'] ?? false,
         ];
