@@ -105,6 +105,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/payments/status', [CustomerChapaPaymentController::class, 'status']);
         Route::post('/payments/{paymentId}/refund', [CustomerChapaPaymentController::class, 'refund']);
         Route::get('/reservations', [CustomerReservationController::class, 'index']);
+        // Customer reviews (authenticated)
+        Route::get('/reviews/mine', [CustomerReviewController::class, 'mine']);
+        Route::post('/reviews', [CustomerReviewController::class, 'store']);
     });
 
     // Protected routes for all authenticated users can be added here
