@@ -33,6 +33,7 @@ class CustomerReservationController extends Controller
 
             return [
                 'id' => $reservation->id,
+                'hotelId' => $reservation->room?->hotel?->id ?? null,
                 'hotelName' => $reservation->room?->hotel?->name ?? 'Unknown Hotel',
                 'roomType' => $reservation->room?->type ?? 'Unknown',
                 'roomNumber' => $reservation->room?->id ?? null,
