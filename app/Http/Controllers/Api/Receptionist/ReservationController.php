@@ -194,14 +194,10 @@ class ReservationController extends Controller
         $checkOut = Carbon::parse($request->input('checkOut'));
         
         $conflictingReservation = Reservation::where('room_id', $room->id)
-            ->where(function ($q) use ($checkIn, $checkOut) {
-                $q->whereBetween('check_in', [$checkIn, $checkOut])
-                  ->orWhereBetween('check_out', [$checkIn, $checkOut])
-                  ->orWhere(function ($sub) use ($checkIn, $checkOut) {
-                      $sub->where('check_in', '<=', $checkIn)
-                          ->where('check_out', '>=', $checkOut);
-                  });
-            })
+            // Inclusive overlap:
+            // existing.check_in <= requested.check_out AND existing.check_out >= requested.check_in
+            ->whereDate('check_in', '<=', $checkOut->toDateString())
+            ->whereDate('check_out', '>=', $checkIn->toDateString())
             ->whereIn('status', ['pending', 'confirmed', 'checked_in'])
             ->exists();
 
@@ -287,7 +283,7 @@ class ReservationController extends Controller
             'status' => 'confirmed', // Walk-ins are automatically confirmed
             'is_walk_in' => true, // Mark as walk-in booking
             'total_amount' => $totalAmount,
-            'payment_status' => PaymentStatus::UNPAID->value,
+            'payment_status' => PaymentStatus::PAID->value,
             'guests' => 1, // Default, can be updated if needed
             'special_requests' => $request->input('specialRequests'),
         ]);
@@ -304,7 +300,10 @@ class ReservationController extends Controller
             'amount' => $totalAmount,
             'currency' => 'ETB',
             'method' => $methodEnum->value,
-            'status' => PaymentTransactionStatus::COMPLETED->value,
+            'status' => PaymentTransactionStatus::PAID->value,
+            // DB constraint: transaction_reference is unique (and in some envs effectively NOT NULL).
+            // Walk-ins still need a reference for reconciliation, even if not from a gateway.
+            'transaction_reference' => 'walkin_' . (string) Str::uuid(),
             'collected_by' => $receptionist->id,
             'meta' => [
                 'walk_in' => true,

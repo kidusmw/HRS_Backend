@@ -243,63 +243,28 @@ class RoomController extends Controller
             ], 400);
         }
 
-        // Get all rooms for this hotel with status = available
-        $query = Room::where('hotel_id', $hotelId)
-            ->where('status', RoomStatus::AVAILABLE);
+        // Inclusive overlap rule:
+        // A reservation overlaps the requested range if:
+        //   existing.check_in <= requested.check_out AND existing.check_out >= requested.check_in
+        //
+        // Since reservations are stored as DATE, we compare date strings for consistency.
+        $startDate = $start->toDateString();
+        $endDate = $end->toDateString();
 
-        // Filter by room type if provided
-        if ($roomType) {
-            $query->where('type', $roomType);
-        }
+        // Get rooms for this hotel with status = available, excluding any room with an overlapping active reservation.
+        $query = Room::where('hotel_id', $hotelId)
+            ->where('status', RoomStatus::AVAILABLE)
+            ->when($roomType, fn ($q) => $q->where('type', $roomType))
+            ->whereDoesntHave('reservations', function ($q) use ($startDate, $endDate) {
+                $q->whereIn('status', ['pending', 'confirmed', 'checked_in'])
+                    ->whereDate('check_in', '<=', $endDate)
+                    ->whereDate('check_out', '>=', $startDate);
+            });
 
         $rooms = $query->get();
 
-        // Get all reservations that might overlap with the date range
-        $reservations = Reservation::whereHas('room', function ($q) use ($hotelId) {
-            $q->where('hotel_id', $hotelId);
-        })
-        ->whereIn('status', ['pending', 'confirmed', 'checked_in'])
-        ->where(function ($q) use ($start, $end) {
-            // Reservations that overlap with the date range (inclusive overlap)
-            $q->where(function ($sub) use ($start, $end) {
-                // Reservation starts within range
-                $sub->whereBetween('check_in', [$start->toDateString(), $end->toDateString()]);
-            })
-            ->orWhere(function ($sub) use ($start, $end) {
-                // Reservation ends within range
-                $sub->whereBetween('check_out', [$start->toDateString(), $end->toDateString()]);
-            })
-            ->orWhere(function ($sub) use ($start, $end) {
-                // Reservation completely contains the range
-                $sub->where('check_in', '<=', $start->toDateString())
-                    ->where('check_out', '>=', $end->toDateString());
-            });
-        })
-        ->get()
-        ->groupBy('room_id');
-
-        // Filter out rooms that are blocked by reservations
-        $availableRooms = $rooms->filter(function ($room) use ($reservations, $start, $end) {
-            if (!isset($reservations[$room->id])) {
-                return true; // No reservations for this room
-            }
-
-            // Check if any reservation overlaps with the date range
-            foreach ($reservations[$room->id] as $reservation) {
-                $resCheckIn = Carbon::parse($reservation->check_in);
-                $resCheckOut = Carbon::parse($reservation->check_out);
-                
-                // Check if reservation overlaps (inclusive)
-                if (!($resCheckOut->lt($start) || $resCheckIn->gt($end))) {
-                    return false; // Room is blocked
-                }
-            }
-
-            return true; // Room is available
-        });
-
         // Transform to frontend format
-        $transformedRooms = $availableRooms->map(function ($room) {
+        $transformedRooms = $rooms->map(function ($room) {
             return $this->transformRoom($room);
         })->values();
 
