@@ -18,7 +18,8 @@ class SystemSettingsResource extends JsonResource
             'defaultCurrency' => 'ETB', // Always ETB
             'defaultTimezone' => 'UTC', // Always UTC
             // Payment options
-            'chapaEnabled' => $this->resource['chapaEnabled'] ?? false,
+            // Chapa is always enabled for customers (no toggle)
+            'chapaEnabled' => true,
             'stripeEnabled' => $this->resource['stripeEnabled'] ?? false,
             'telebirrEnabled' => $this->resource['telebirrEnabled'] ?? false,
         ];

@@ -35,7 +35,8 @@ class SettingsController extends Controller
             'defaultCurrency' => 'ETB', // Always ETB
             'defaultTimezone' => 'UTC', // Always UTC
             // Payment options
-            'chapaEnabled' => (bool) SystemSetting::getValue('chapa_enabled', false),
+            // Chapa is always enabled for customers (no toggle)
+            'chapaEnabled' => true,
             'stripeEnabled' => (bool) SystemSetting::getValue('stripe_enabled', false),
             'telebirrEnabled' => (bool) SystemSetting::getValue('telebirr_enabled', false),
         ];
@@ -58,7 +59,8 @@ class SettingsController extends Controller
             'systemLogoUrl' => $oldLogoUrl,
             'defaultCurrency' => 'ETB',
             'defaultTimezone' => 'UTC',
-            'chapaEnabled' => (bool) SystemSetting::getValue('chapa_enabled', false),
+            // Chapa is always enabled for customers (no toggle)
+            'chapaEnabled' => true,
             'stripeEnabled' => (bool) SystemSetting::getValue('stripe_enabled', false),
             'telebirrEnabled' => (bool) SystemSetting::getValue('telebirr_enabled', false),
         ];
@@ -121,10 +123,13 @@ class SettingsController extends Controller
             if ($key === 'defaultCurrency' || $key === 'defaultTimezone') {
                 continue;
             }
+            // Chapa is always enabled; ignore updates to chapaEnabled
+            if ($key === 'chapaEnabled') {
+                continue;
+            }
 
             $settingKey = match($key) {
                 'systemName' => 'system_name',
-                'chapaEnabled' => 'chapa_enabled',
                 'stripeEnabled' => 'stripe_enabled',
                 'telebirrEnabled' => 'telebirr_enabled',
                 default => null,

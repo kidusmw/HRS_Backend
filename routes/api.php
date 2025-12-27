@@ -41,9 +41,11 @@ use App\Http\Controllers\Api\Receptionist\DashboardController as ReceptionistDas
 use App\Http\Controllers\Api\Receptionist\RoomController as ReceptionistRoomController;
 use App\Http\Controllers\Api\Receptionist\ReservationController as ReceptionistReservationController;
 use App\Http\Controllers\Api\Receptionist\ReportController as ReceptionistReportController;
+use App\Http\Controllers\Api\Receptionist\AvailabilityController as ReceptionistAvailabilityController;
 use App\Http\Controllers\Api\Customer\HotelController as CustomerHotelController;
 use App\Http\Controllers\Api\Customer\ReviewController as CustomerReviewController;
 use App\Http\Controllers\Api\Customer\AvailabilityController as CustomerAvailabilityController;
+use App\Http\Controllers\Api\Customer\AvailabilityCalendarController as CustomerAvailabilityCalendarController;
 use App\Http\Controllers\Api\Customer\Payments\ChapaPaymentController as CustomerChapaPaymentController;
 use App\Http\Controllers\Api\ChapaWebhookController;
 use App\Http\Controllers\Api\Customer\ReservationIntentController;
@@ -79,6 +81,8 @@ Route::prefix('customer')->group(function () {
     
     // Availability
     Route::get('/hotels/{hotelId}/availability', [CustomerAvailabilityController::class, 'show']);
+    Route::get('/hotels/{hotelId}/availability/checkin-dates', [CustomerAvailabilityCalendarController::class, 'checkInDates']);
+    Route::get('/hotels/{hotelId}/availability/checkout-dates', [CustomerAvailabilityCalendarController::class, 'checkOutDates']);
 });
 
 /**
@@ -225,6 +229,10 @@ Route::prefix('receptionist')->middleware(['auth:sanctum', 'role:receptionist'])
     Route::get('/rooms', [ReceptionistRoomController::class, 'index']);
     Route::get('/rooms/available', [ReceptionistRoomController::class, 'available']);
     Route::patch('/rooms/{id}/status', [ReceptionistRoomController::class, 'updateStatus']);
+
+    // Availability calendar (disable unavailable dates in walk-in flow)
+    Route::get('/availability/checkin-dates', [ReceptionistAvailabilityController::class, 'checkInDates']);
+    Route::get('/availability/checkout-dates', [ReceptionistAvailabilityController::class, 'checkOutDates']);
 
     // Reservations (hotel-scoped)
     Route::get('/reservations', [ReceptionistReservationController::class, 'index']);
