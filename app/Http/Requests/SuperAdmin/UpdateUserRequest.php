@@ -41,7 +41,7 @@ class UpdateUserRequest extends FormRequest
                 },
             ],
             'hotel_id' => ['nullable', 'integer', 'exists:hotels,id'],
-            'phone_number' => ['nullable', 'string', 'max:20'],
+            'phone_number' => ['nullable', 'string', 'max:20', Rule::unique('users', 'phone_number')->ignore($userId)],
             'active' => ['sometimes', 'boolean'],
         ];
     }

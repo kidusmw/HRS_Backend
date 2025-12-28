@@ -3,6 +3,7 @@
 namespace App\Http\Requests\SuperAdmin;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateHotelRequest extends FormRequest
 {
@@ -21,11 +22,13 @@ class UpdateHotelRequest extends FormRequest
      */
     public function rules(): array
     {
+        $hotelId = $this->route('id');
+
         return [
             'name' => ['sometimes', 'string', 'max:255'],
             'city' => ['sometimes', 'required', 'string', 'max:255'],
             'country' => ['sometimes', 'required', 'string', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:20'],
+            'phone' => ['sometimes', 'required', 'string', 'regex:/^\+[1-9]\d{1,14}$/', 'max:20', Rule::unique('hotels', 'phone')->ignore($hotelId)],
             'email' => ['nullable', 'email', 'max:255'],
             'description' => ['nullable', 'string'],
             'timezone' => ['sometimes', 'nullable', 'string', 'timezone'], // Auto-determined from city/country if not provided
@@ -44,6 +47,13 @@ class UpdateHotelRequest extends FormRequest
                     }
                 },
             ],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'phone.regex' => 'Phone number must be in E.164 format (e.g., +251912345678)',
         ];
     }
 }
