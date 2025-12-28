@@ -50,6 +50,7 @@ use App\Http\Controllers\Api\Customer\Payments\ChapaPaymentController as Custome
 use App\Http\Controllers\Api\ChapaWebhookController;
 use App\Http\Controllers\Api\Customer\ReservationIntentController;
 use App\Http\Controllers\Api\Customer\CustomerReservationController;  
+use App\Http\Controllers\Api\SystemSettingsController;
 
 /**
  * Public Routes
@@ -58,6 +59,9 @@ Route::post('/register', [RegisterController::class, 'register']);
 Route::post('/login', [LoginController::class, 'login']);
 Route::get('/auth/google/redirect', [LoginController::class, 'redirectToGoogle'])->name('google.redirect');
 Route::get('/auth/google/callback', [LoginController::class, 'handleGoogleCallback'])->name('google.callback');
+
+// Public system settings (for favicon/title, etc.)
+Route::get('/system/settings', SystemSettingsController::class);
 
 // Email verification route - must be named 'verification.verify' for VerifyEmail notification
 Route::get('/email/verify/{id}/{hash}', VerifyEmailController::class)

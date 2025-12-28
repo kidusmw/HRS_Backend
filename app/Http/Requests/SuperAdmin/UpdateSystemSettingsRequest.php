@@ -15,7 +15,14 @@ class UpdateSystemSettingsRequest extends FormRequest
     {
         return [
             'systemName' => ['sometimes', 'string', 'max:255'],
-            'logo' => ['sometimes', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'], // 5MB max
+            // NOTE: SVG is not considered an "image" by Laravel's `image` rule, so we validate via mimes/mimetypes.
+            'logo' => [
+                'sometimes',
+                'file',
+                'max:5120', // 5MB max
+                'mimetypes:image/jpeg,image/png,image/webp,image/svg+xml',
+                'mimes:jpg,jpeg,png,webp,svg',
+            ],
             // Removed systemLogoUrl - only file uploads allowed
             // Currency and timezone are fixed to USD/UTC, no longer editable
             // Payment options
