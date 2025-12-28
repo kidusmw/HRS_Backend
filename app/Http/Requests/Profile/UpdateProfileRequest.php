@@ -18,7 +18,7 @@ class UpdateProfileRequest extends FormRequest
         return [
             'name' => 'sometimes|string|max:255',
             'email' => 'sometimes|string|email|max:255|unique:users,email,' . $userId,
-            'phoneNumber' => 'nullable|string|regex:/^\+[1-9]\d{1,14}$/',
+            'phoneNumber' => 'nullable|string|regex:/^\+[1-9]\d{1,14}$/|unique:users,phone_number,' . $userId,
             'avatar' => 'nullable|image|max:5120', // 5MB
             'removeAvatar' => 'sometimes|boolean',
         ];
