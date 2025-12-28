@@ -81,20 +81,20 @@ class DashboardController extends Controller
         $now = Carbon::now();
         $start = $now->copy()->subMonthsNoOverflow($months - 1)->startOfMonth();
 
-        $rows = Reservation::selectRaw('strftime("%Y-%m", created_at) as month, count(*) as total')
-            ->whereHas('room', fn ($q) => $q->where('hotel_id', $hotelId))
+        // DB-agnostic monthly aggregation (works on MySQL/Postgres/SQLite)
+        // We group in PHP to avoid using SQLite-only functions like strftime().
+        $rows = Reservation::whereHas('room', fn ($q) => $q->where('hotel_id', $hotelId))
             ->whereDate('created_at', '>=', $start)
-            ->groupBy('month')
-            ->orderBy('month')
-            ->get()
-            ->keyBy('month');
+            ->get(['id', 'created_at'])
+            ->groupBy(fn ($res) => Carbon::parse($res->created_at)->format('Y-m'))
+            ->map(fn ($group) => $group->count());
 
         $trend = [];
         for ($i = 0; $i < $months; $i++) {
             $label = $start->copy()->addMonths($i)->format('Y-m');
             $trend[] = [
                 'month' => $label,
-                'bookings' => (int) ($rows[$label]->total ?? 0),
+                'bookings' => (int) ($rows[$label] ?? 0),
             ];
         }
 
