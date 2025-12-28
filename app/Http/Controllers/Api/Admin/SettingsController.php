@@ -96,10 +96,9 @@ class SettingsController extends Controller
 
             $oldValue = HotelSetting::getValue($hotelId, $settingKey);
 
-            DB::table('hotel_settings')->updateOrInsert(
-                ['hotel_id' => $hotelId, 'key' => $settingKey],
-                ['value' => $value, 'updated_at' => now(), 'created_at' => now()]
-            );
+            // Use the model helper to ensure JSON columns receive valid JSON text
+            // (MySQL JSON rejects raw strings like 15:00 unless encoded as "15:00")
+            HotelSetting::setValue($hotelId, $settingKey, $value);
 
             // Track changes for audit log (loose comparison for type differences)
             if ($oldValue != $value) {
