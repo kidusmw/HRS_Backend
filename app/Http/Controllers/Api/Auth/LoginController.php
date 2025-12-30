@@ -122,6 +122,8 @@ class LoginController extends Controller
                     'name' => $name,
                     'email' => $email,
                     'password' => Str::random(32),
+                    // Phone is collected later via profile completion; reservation flows enforce presence.
+                    'phone_number' => null,
                     'role' => UserRole::CLIENT,
                     'email_verified_at' => now(),
                     'active' => true,
