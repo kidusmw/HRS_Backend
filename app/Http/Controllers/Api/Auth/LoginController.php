@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use App\Models\User;
 use App\Enums\UserRole;
+use App\Services\AuditLogger;
 use Laravel\Socialite\Facades\Socialite;
 use Illuminate\Support\Str;
 
@@ -77,6 +78,13 @@ class LoginController extends Controller
         // Create a new personal access token for the user with granular abilities
         $token = $user->createToken('auth_token', $abilities)->plainTextToken;
 
+        // Log login action for attendance tracking
+        AuditLogger::log('user.login', $user, $user->hotel_id, [
+            'user_id' => $user->id,
+            'user_name' => $user->name,
+            'login_time' => now()->toIso8601String(),
+        ]);
+
         return response()->json([
             'message' => 'Login successful',
             'user' => $user,
@@ -114,6 +122,8 @@ class LoginController extends Controller
                     'name' => $name,
                     'email' => $email,
                     'password' => Str::random(32),
+                    // Phone is collected later via profile completion; reservation flows enforce presence.
+                    'phone_number' => null,
                     'role' => UserRole::CLIENT,
                     'email_verified_at' => now(),
                     'active' => true,
@@ -162,6 +172,14 @@ class LoginController extends Controller
             }
 
             $token = $user->createToken('auth_token', $abilities)->plainTextToken;
+
+            // Log login action for attendance tracking
+            AuditLogger::log('user.login', $user, $user->hotel_id, [
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'login_time' => now()->toIso8601String(),
+                'method' => 'google',
+            ]);
 
             return response()->json([
                 'message' => 'Google authentication successful',

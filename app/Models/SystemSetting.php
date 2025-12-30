@@ -11,7 +11,24 @@ class SystemSetting extends Model
         'value',
     ];
 
-    // No casts needed - value is stored as string/text
+    /**
+     * NOTE:
+     * The `system_settings.value` column is a JSON column in the DB.
+     * MySQL requires valid JSON text, so scalars must be JSON-encoded (e.g. "foo", true, 123).
+     */
+
+    private static function encodeJsonValue(mixed $value): mixed
+    {
+        if ($value === null) return null;
+        return json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    }
+
+    private static function decodeJsonValue(mixed $value): mixed
+    {
+        if ($value === null) return null;
+        $decoded = json_decode((string) $value, true);
+        return (json_last_error() === JSON_ERROR_NONE) ? $decoded : $value;
+    }
 
     /**
      * Get a setting value by key
@@ -19,7 +36,9 @@ class SystemSetting extends Model
     public static function getValue(string $key, mixed $default = null): mixed
     {
         $setting = static::where('key', $key)->first();
-        return $setting?->value ?? $default;
+        if (!$setting) return $default;
+        $decoded = static::decodeJsonValue($setting->value);
+        return $decoded ?? $default;
     }
 
     /**
@@ -29,7 +48,7 @@ class SystemSetting extends Model
     {
         static::updateOrCreate(
             ['key' => $key],
-            ['value' => $value]
+            ['value' => static::encodeJsonValue($value)]
         );
     }
 }

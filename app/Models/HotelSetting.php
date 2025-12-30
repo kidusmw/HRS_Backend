@@ -24,11 +24,23 @@ class HotelSetting extends Model
         'value',
     ];
 
-    protected function casts(): array
+    /**
+     * NOTE:
+     * The `hotel_settings.value` column is a JSON column in the DB.
+     * MySQL requires valid JSON text, so scalars must be JSON-encoded.
+     */
+
+    private static function encodeJsonValue(mixed $value): mixed
     {
-        return [
-            'value' => 'array',
-        ];
+        if ($value === null) return null;
+        return json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    }
+
+    private static function decodeJsonValue(mixed $value): mixed
+    {
+        if ($value === null) return null;
+        $decoded = json_decode((string) $value, true);
+        return (json_last_error() === JSON_ERROR_NONE) ? $decoded : $value;
     }
 
     /**
@@ -47,7 +59,9 @@ class HotelSetting extends Model
         $setting = static::where('hotel_id', $hotelId)
             ->where('key', $key)
             ->first();
-        return $setting?->value ?? $default;
+        if (!$setting) return $default;
+        $decoded = static::decodeJsonValue($setting->value);
+        return $decoded ?? $default;
     }
 
     /**
@@ -57,7 +71,7 @@ class HotelSetting extends Model
     {
         static::updateOrCreate(
             ['hotel_id' => $hotelId, 'key' => $key],
-            ['value' => $value]
+            ['value' => static::encodeJsonValue($value)]
         );
     }
 }

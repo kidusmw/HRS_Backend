@@ -29,8 +29,10 @@ class User extends Authenticatable
         'password',
         'role',
         'hotel_id',
+        'supervisor_id',
         'active',
         'phone_number',
+        'avatar_path',
     ];
 
     /**
@@ -66,6 +68,16 @@ class User extends Authenticatable
         return $this->belongsTo(Hotel::class);
     }
 
+    public function supervisor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'supervisor_id');
+    }
+
+    public function subordinates(): HasMany
+    {
+        return $this->hasMany(User::class, 'supervisor_id');
+    }
+
     public function auditLogs(): HasMany
     {
         return $this->hasMany(AuditLog::class);
@@ -81,6 +93,15 @@ class User extends Authenticatable
         return $this->hasMany(Backup::class, 'created_by');
     }
 
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(Review::class);
+    }
+
+    public function collectedPayments(): HasMany
+    {
+        return $this->hasMany(Payment::class, 'collected_by');
+    }
 
     /**
      * Role Check Helper methods

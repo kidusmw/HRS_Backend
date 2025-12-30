@@ -20,12 +20,20 @@ class RegisterController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
+            'phoneNumber' => 'required|string|regex:/^\+[1-9]\d{1,14}$/|unique:users,phone_number',
+        ], 
+        // Validation messages
+        [
+            'phoneNumber.required' => 'Phone number is required',
+            'phoneNumber.regex' => 'Phone number must be in E.164 format (e.g., +251912345678)',
+            'phoneNumber.unique' => 'Phone number is already in use.',
         ]);
 
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => $request->password,
+            'phone_number' => $request->phoneNumber,
             'role' => UserRole::CLIENT,
         ]);
 
