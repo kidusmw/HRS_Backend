@@ -8,8 +8,8 @@ use App\Http\Requests\Admin\UpdateHotelImageRequest;
 use App\Http\Resources\HotelImageResource;
 use App\Models\HotelImage;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use App\Support\Media;
 
 class HotelImageController extends Controller
 {
@@ -83,7 +83,7 @@ class HotelImageController extends Controller
             $sequence = $existingCount + $index + 1;
             $fileName = "{$hotelSlug}_{$sequence}.{$extension}";
 
-            $path = $file->storeAs("hotel-images/{$hotelId}", $fileName, 'public');
+            $path = $file->storeAs("hotel-images/{$hotelId}", $fileName, Media::diskName());
 
             $displayOrder = $displayOrders[$index] ?? null;
             if ($displayOrder === null || !is_numeric($displayOrder)) {
@@ -164,10 +164,7 @@ class HotelImageController extends Controller
 
         $image = HotelImage::where('hotel_id', $hotelId)->findOrFail($id);
 
-        // if the image url exists and the image url is in the public storage, delete the image
-        if ($image->image_url && Storage::disk('public')->exists($image->image_url)) {
-            Storage::disk('public')->delete($image->image_url);
-        }
+        Media::deleteIfPresent($image->image_url);
 
         $image->delete();
 

@@ -20,6 +20,7 @@ class SuperAdminSeeder extends Seeder
             [
                 'name' => 'Super Admin',
                 'email' => 'superadmin@example.com',
+                'phone_number' => '+251913584756',
                 'password' => Hash::make('password'),
                 'role' => UserRole::SUPERADMIN,
                 'active' => true,

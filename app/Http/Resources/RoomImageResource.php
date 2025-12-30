@@ -4,20 +4,13 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\Storage;
+use App\Support\Media;
 
 class RoomImageResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
-        $url = null;
-        if ($this->image_url) {
-            $generated = Storage::disk('public')->url($this->image_url);
-            // if the generated url starts with http, then use it, otherwise add the app.url to the generated url
-            $url = str_starts_with($generated, 'http')
-                ? $generated
-                : rtrim(config('app.url'), '/') . $generated;
-        }
+        $url = Media::url($this->image_url);
 
         return [
             'id' => $this->id,

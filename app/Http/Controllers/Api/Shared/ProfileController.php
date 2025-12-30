@@ -6,10 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Profile\UpdatePasswordRequest;
 use App\Http\Requests\Profile\UpdateProfileRequest;
 use App\Http\Resources\UserResource;
+use App\Support\Media;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Storage;
 
 class ProfileController extends Controller
 {
@@ -45,7 +45,7 @@ class ProfileController extends Controller
 
         // Remove existing avatar if requested
         if (!empty($validated['removeAvatar']) && $user->avatar_path) {
-            Storage::disk('public')->delete($user->avatar_path);
+            Media::deleteIfPresent($user->avatar_path);
             $user->avatar_path = null;
         }
 
@@ -58,9 +58,9 @@ class ProfileController extends Controller
                 'size' => $request->file('avatar')->getSize(),
             ]);
             if ($user->avatar_path) {
-                Storage::disk('public')->delete($user->avatar_path);
+                Media::deleteIfPresent($user->avatar_path);
             }
-            $path = $request->file('avatar')->store('avatars', 'public');
+            $path = $request->file('avatar')->store('avatars', Media::diskName());
             $user->avatar_path = $path;
         } else {
             logger()->info('ProfileController: no avatar file present', [

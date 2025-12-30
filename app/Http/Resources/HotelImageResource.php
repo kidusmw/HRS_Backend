@@ -4,7 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\Storage;
+use App\Support\Media;
 
 class HotelImageResource extends JsonResource
 {
@@ -13,17 +13,7 @@ class HotelImageResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $url = null;
-        if ($this->image_url) {
-            $generated = Storage::disk('public')->url($this->image_url);
-            // Ensure absolute URL even when Storage::url returns a relative path
-            if (str_starts_with($generated, 'http')) {
-                $url = $generated;
-            } else {
-                $appUrl = rtrim(config('app.url'), '/');
-                $url = $appUrl . $generated;
-            }
-        }
+        $url = Media::url($this->image_url);
 
         return [
             'id' => $this->id,

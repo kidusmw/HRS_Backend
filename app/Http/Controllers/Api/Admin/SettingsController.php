@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\HotelSetting;
 use App\Services\AuditLogger;
 use App\Http\Requests\Admin\UpdateHotelSettingsRequest;
-use Illuminate\Support\Facades\Storage;
+use App\Support\Media;
 use Illuminate\Support\Facades\DB;
 
 class SettingsController extends Controller
@@ -38,7 +38,7 @@ class SettingsController extends Controller
             //
             $resolvedLogoUrl = str_starts_with($logoPath, 'http')
                 ? $logoPath
-                : Storage::disk('public')->url($logoPath);
+                : Media::url($logoPath);
         }
 
         // Get all settings with defaults
@@ -115,12 +115,12 @@ class SettingsController extends Controller
             $file = $request->file('logo');
             $extension = $file->getClientOriginalExtension() ?: 'png';
             $filename = 'logo_' . $hotelId . '.' . $extension;
-            $path = $file->storeAs("hotel-logos/{$hotelId}", $filename, 'public');
+            $path = $file->storeAs("hotel-logos/{$hotelId}", $filename, Media::diskName());
 
             $oldValue = $hotel?->logo_path;
             $changes['logoUrl'] = [
-                'old' => $oldValue ? (str_starts_with($oldValue, 'http') ? $oldValue : Storage::disk('public')->url($oldValue)) : null,
-                'new' => Storage::disk('public')->url($path),
+                'old' => $oldValue ? (str_starts_with($oldValue, 'http') ? $oldValue : Media::url($oldValue)) : null,
+                'new' => Media::url($path),
             ];
             $hotel->logo_path = $path;
             $hotel->save();

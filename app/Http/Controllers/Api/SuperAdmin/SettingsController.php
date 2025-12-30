@@ -11,7 +11,7 @@ use App\Http\Resources\SystemSettingsResource;
 use App\Http\Requests\SuperAdmin\UpdateSystemSettingsRequest;
 use App\Http\Requests\SuperAdmin\UpdateHotelSettingsRequest;
 use App\Services\AuditLogger;
-use Illuminate\Support\Facades\Storage;
+use App\Support\Media;
 
 class SettingsController extends Controller
 {
@@ -25,7 +25,7 @@ class SettingsController extends Controller
             // If it's a data URL or external URL, ignore it (old invalid data)
             if (!str_starts_with($logoPath, 'data:image/') && !str_starts_with($logoPath, 'http://') && !str_starts_with($logoPath, 'https://')) {
                 // Always treat as storage path and generate URL
-                $resolvedLogoUrl = Storage::disk('public')->url($logoPath);
+                $resolvedLogoUrl = Media::url($logoPath);
             }
         }
 
@@ -51,7 +51,7 @@ class SettingsController extends Controller
         // Only generate URL if it's a valid file path (not a data URL or external URL)
         $oldLogoUrl = null;
         if ($oldLogoPath && !str_starts_with($oldLogoPath, 'data:image/') && !str_starts_with($oldLogoPath, 'http://') && !str_starts_with($oldLogoPath, 'https://')) {
-            $oldLogoUrl = Storage::disk('public')->url($oldLogoPath);
+            $oldLogoUrl = Media::url($oldLogoPath);
         }
         
         $oldSettings = [
@@ -90,19 +90,19 @@ class SettingsController extends Controller
             
             $extension = $file->getClientOriginalExtension() ?: 'png';
             $filename = 'system_logo.' . $extension;
-            $path = $file->storeAs('system-logos', $filename, 'public');
+            $path = $file->storeAs('system-logos', $filename, Media::diskName());
 
             // Delete old logo file if it exists and is a valid file path (not a data URL)
             if ($oldLogoPath && !str_starts_with($oldLogoPath, 'data:image/') && !str_starts_with($oldLogoPath, 'http://') && !str_starts_with($oldLogoPath, 'https://')) {
                 // Only delete if it's a storage file path
                 try {
-                    Storage::disk('public')->delete($oldLogoPath);
+                    Media::deleteIfPresent($oldLogoPath);
                 } catch (\Exception $e) {
                     // Ignore errors if file doesn't exist
                 }
             }
 
-            $newLogoUrl = Storage::disk('public')->url($path);
+            $newLogoUrl = Media::url($path);
             $changes['systemLogoUrl'] = [
                 'old' => $oldLogoUrl,
                 'new' => $newLogoUrl,
