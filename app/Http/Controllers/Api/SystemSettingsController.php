@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\SystemSetting;
-use Illuminate\Support\Facades\Storage;
+use App\Support\Media;
 
 class SystemSettingsController extends Controller
 {
@@ -20,7 +20,7 @@ class SystemSettingsController extends Controller
                 !str_starts_with($logoPath, 'http://') &&
                 !str_starts_with($logoPath, 'https://')
             ) {
-                $systemLogoUrl = Storage::disk('public')->url($logoPath);
+                $systemLogoUrl = Media::url($logoPath);
             }
         }
 

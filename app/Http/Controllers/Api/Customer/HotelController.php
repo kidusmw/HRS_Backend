@@ -5,9 +5,9 @@ namespace App\Http\Controllers\Api\Customer;
 use App\Http\Controllers\Controller;
 use App\Models\Hotel;
 use App\Models\Room;
+use App\Support\Media;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 
 class HotelController extends Controller
 {
@@ -136,12 +136,7 @@ class HotelController extends Controller
         $roomTypes = $hotel->rooms->groupBy('type')->map(function ($rooms, $type) {
             $firstRoom = $rooms->first();
             $images = $firstRoom->images->take(3)->map(function ($img) {
-                $url = Storage::disk('public')->url($img->image_url);
-                if (!str_starts_with($url, 'http')) {
-                    $appUrl = rtrim(config('app.url'), '/');
-                    $url = $appUrl . $url;
-                }
-                return $url;
+                return Media::url($img->image_url);
             })->values();
 
             return [
@@ -160,12 +155,7 @@ class HotelController extends Controller
             'address' => "{$hotel->city}, {$hotel->country}", // Derived from city + country
             'description' => $hotel->description,
             'images' => $hotel->images->map(function ($img) {
-                $url = Storage::disk('public')->url($img->image_url);
-                if (!str_starts_with($url, 'http')) {
-                    $appUrl = rtrim(config('app.url'), '/');
-                    $url = $appUrl . $url;
-                }
-                return $url;
+                return Media::url($img->image_url);
             })->values(),
             'roomTypes' => $roomTypes,
             'reviewSummary' => [
@@ -194,12 +184,7 @@ class HotelController extends Controller
             'priceFrom' => (float) $minPrice,
             'rating' => $hotel->reviewSummary['averageRating'] ?? 0.0,
             'images' => $hotel->images->map(function ($img) {
-                $url = Storage::disk('public')->url($img->image_url);
-                if (!str_starts_with($url, 'http')) {
-                    $appUrl = rtrim(config('app.url'), '/');
-                    $url = $appUrl . $url;
-                }
-                return $url;
+                return Media::url($img->image_url);
             })->values()->toArray(),
             'reviewSummary' => $hotel->reviewSummary ?? [
                 'averageRating' => 0.0,

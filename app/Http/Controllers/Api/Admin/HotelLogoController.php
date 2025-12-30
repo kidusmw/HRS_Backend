@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreHotelLogoRequest;
 use App\Http\Resources\HotelLogoResource;
 use App\Models\Hotel;
-use Illuminate\Support\Facades\Storage;
+use App\Support\Media;
 
 class HotelLogoController extends Controller
 {
@@ -43,7 +43,7 @@ class HotelLogoController extends Controller
         $file = $request->file('logo');
         $extension = $file->getClientOriginalExtension() ?: 'png';
         $filename = 'logo_' . $hotelId . '.' . $extension;
-        $path = $file->storeAs("hotel-logos/{$hotelId}", $filename, 'public');
+        $path = $file->storeAs("hotel-logos/{$hotelId}", $filename, Media::diskName());
 
         $hotel->logo_path = $path;
         $hotel->save();

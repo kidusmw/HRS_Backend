@@ -9,8 +9,8 @@ use App\Http\Resources\RoomImageResource;
 use App\Models\Room;
 use App\Models\RoomImage;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use App\Support\Media;
 
 class RoomImageController extends Controller
 {
@@ -80,7 +80,7 @@ class RoomImageController extends Controller
             $sequence = $existingCount + $index + 1;
             $fileName = "{$roomSlug}_{$sequence}.{$extension}";
 
-            $path = $file->storeAs("room-images/{$room->id}", $fileName, 'public');
+            $path = $file->storeAs("room-images/{$room->id}", $fileName, Media::diskName());
 
             $displayOrder = $displayOrders[$index] ?? null;
             if ($displayOrder === null || !is_numeric($displayOrder)) {
@@ -154,9 +154,7 @@ class RoomImageController extends Controller
         $image = RoomImage::findOrFail($id);
         $room = Room::where('hotel_id', $hotelId)->findOrFail($image->room_id);
 
-        if ($image->image_url && Storage::disk('public')->exists($image->image_url)) {
-            Storage::disk('public')->delete($image->image_url);
-        }
+        Media::deleteIfPresent($image->image_url);
 
         $image->delete();
 
