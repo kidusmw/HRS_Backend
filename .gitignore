@@ -23,5 +23,5 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 SUPER_ADMIN_API.md
-aiven-ca.pem
-aiven-ca.pem:Zone.Identifier
+# aiven-ca.pem
+# aiven-ca.pem:Zone.Identifier

@@ -18,7 +18,7 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 # Copy application code
 COPY . .
-COPY aiven-ca.pem /var/www/html/aiven-ca.pem
+COPY docker/aiven-ca.pem /var/www/html/aiven-ca.pem
 
 # Install PHP dependencies
 RUN composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
