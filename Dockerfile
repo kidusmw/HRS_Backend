@@ -18,6 +18,8 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 # Copy application code
 COPY . .
+
+# Copy Aiven SSL certificate
 COPY aiven-ca.pem /var/www/html/aiven-ca.pem
 
 # Install PHP dependencies
@@ -31,6 +33,9 @@ RUN mkdir -p \
     bootstrap/cache \
  && chown -R www-data:www-data storage bootstrap/cache \
  && chmod -R 775 storage bootstrap/cache
+
+# --- NEW: Clear Laravel config and cache so SSL env is picked up ---
+RUN php artisan config:clear && php artisan cache:clear
 
 # Copy nginx and supervisor configs
 COPY ./docker/nginx.conf /etc/nginx/sites-available/default
