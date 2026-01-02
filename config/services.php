@@ -19,7 +19,8 @@ return [
     ],
 
     'resend' => [
-        'key' => env('RESEND_KEY'),
+        // Prefer RESEND_API_KEY (official). Keep RESEND_KEY as fallback for older envs.
+        'key' => env('RESEND_API_KEY', env('RESEND_KEY')),
     ],
 
     'ses' => [
